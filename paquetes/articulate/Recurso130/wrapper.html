@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta http-equiv="cache-control"
+        content="no-cache">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1">
+  <meta name="format-detection"
+        content="telephone=no">
+  <title>Wrapper</title>
+</head>
+
+<body style="margin:0">
+  <script>
+    // Las mismas funciones del interceptor.js.
+    function API_1484_11() { };
+    const API = API_1484_11;
+    let data = '';
+    const obj = {
+      action: '',
+      value: null
+    };
+    API.Initialize = () => {
+      obj.action = 'Initialize';
+      obj.value = null;
+      return enviaPostMessage();
+    }
+    API.Commit = () => {
+      obj.action = 'Commit';
+      obj.value = null;
+      return enviaPostMessage();
+    }
+    API.Terminate = () => {
+      obj.action = 'Terminate';
+      obj.value = null;
+      return enviaPostMessage();
+    }
+    API.SetValue = (atributo, valor) => {
+      const datos = JSON.parse(data);
+      datos[atributo] = valor;
+      data = JSON.stringify(datos);
+      obj.action = 'SetValue';
+      obj.value = {};
+      obj.value[atributo] = valor;
+      return enviaPostMessage();
+    }
+    API.GetValue = (atributo) => {
+      const datos = JSON.parse(data);
+      console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
+      return JSON.stringify(datos[atributo]);
+    };
+    API.GetLastError = () => {
+      obj.action = 'GetLastError';
+      obj.value = null;
+      return enviaPostMessage('0');
+    };
+    function enviaPostMessage(respuesta = 'true') {
+      console.log('WRAPPER: ', obj);
+      parent.window.postMessage(obj, '*');
+      return respuesta;
+    }
+    window.addEventListener(
+      "message",
+      (event) => {
+        if (typeof event.data == 'object' && event.data['cmi.suspend_data']) {
+          console.log('WRAPPER: Recibo datos del PARENT = ', event.data);
+          data = JSON.stringify(event.data ?? {});
+        }
+      },
+      false
+    );
+    // Se comprueba, a partir de una llamada GET si el recurso es un Articulate SCORM (index_lms.html), un mAuthor SCORM (index.html) o un Articulate expositivo (story.html)
+    const tipoRecurso = [
+      { tipo: 'mAuthor', index: 'index.html' },
+      { tipo: 'Articulate SCORM', index: 'index_lms.html' },
+      { tipo: 'Articulate EXPOS', index: 'story.html' }
+    ];
+    let numRecurso = 0;
+    verificaRecurso();
+    function verificaRecurso() {
+      const httpRequest = new XMLHttpRequest();
+      httpRequest.onreadystatechange = () => {
+        if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          if (httpRequest.status === 200) {
+            console.log('WRAPPER: El recurso ha sido identificado como ' + tipoRecurso[numRecurso].tipo);
+            cargaRecurso();
+          } else {
+            numRecurso++;
+            (numRecurso < tipoRecurso.length) ? verificaRecurso(numRecurso) : console.log('WRAPPER: El recurso no ha sido identificado, se aborta toda operación.');
+          }
+        }
+      }
+      httpRequest.open('GET', tipoRecurso[numRecurso].index);
+      httpRequest.send();
+    }
+    // Verifica cada 100ms si ya se han obtenido los datos en data. De ser así, carga el iframe con el recurso
+    function cargaRecurso() {
+      const interval = setInterval(() => {
+        if (data != '') {
+          clearInterval(interval);
+          const iframe = document.createElement('iframe');
+          iframe.setAttribute('style', 'height:100vh;width:100vw;border:none');
+          iframe.src = tipoRecurso[numRecurso].index;
+          document.body.appendChild(iframe);
+          iframe.onload = () => {
+            iframe.contentWindow.document.addEventListener('click', (ev) => {
+              ev.stopImmediatePropagation();
+              ev.preventDefault();
+              ev.stopPropagation();
+              const elemento = ev.target || ev.srcElement;
+              if (elemento.tagName === 'A') {
+                const mensaje = {
+                  action: 'enlace',
+                  value: elemento.href
+                };
+                parent.window.postMessage(mensaje, '*');
+                return false;
+              }
+              return false;
+            });
+          };
+        }
+      }, 100);
+    }
+  </script>
+</body>
+
+</html>

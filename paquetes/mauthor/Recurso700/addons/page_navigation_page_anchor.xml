@@ -1,0 +1,138 @@
+<?xml version='1.0' encoding='UTF-8' ?><addon id='page_navigation_page_anchor'><metadata></metadata><model><property name='pageNumber' displayName='Page' type='number' isLocalized='false' isDefault='false'/><property name='pageName' displayName='Name' type='string' isLocalized='false' isDefault='false'/></model><resources></resources><css>.navigation-page-anchor {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.navigation-page-anchor-even {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.navigation-page-anchor-odd {
+    background-color: rgba(255, 255, 255, 0.1);
+}</css><view>&lt;div class=&quot;navigation-page-anchor&quot;&gt;
+
+&lt;/div&gt;</view><preview>&lt;div class=&quot;navigation-page-anchor&quot;&gt;
+
+&lt;/div&gt;</preview><presenter>function Addonpage_navigation_page_anchor_create() {
+    var presenter = function () {
+    };
+
+    presenter.ERROR_CODES = {
+        &apos;P01&apos;: &quot;Page must be a positive number!&quot;,
+        &apos;P02&apos;: &quot;Page is not a number!&quot;,
+    };
+
+    function presenterLogic(view, model) {
+        presenter.$view = $(view);
+        var containerDimensions = DOMOperationsUtils.getOuterDimensions(presenter.$view);
+        var containerDistances = DOMOperationsUtils.calculateOuterDistances(containerDimensions);
+
+        presenter.$view.css({
+            width: (presenter.$view.width() - containerDistances.horizontal) + &apos;px&apos;,
+            height: (presenter.$view.height() - containerDistances.vertical) + &apos;px&apos;
+        });
+
+        presenter.configuration = presenter.validateModel(model);
+        if (presenter.configuration.isError) {
+            DOMOperationsUtils.showErrorMessage(presenter.$view, presenter.ERROR_CODES, presenter.configuration.errorCode);
+            return;
+        }
+
+        var elementWrapper = presenter.$view.find(&apos;.navigation-page-anchor:first&apos;)[0];
+        if (presenter.configuration.page % 2 == 0) {
+            $(elementWrapper).addClass(&apos;navigation-page-anchor-even&apos;);
+        } else {
+            $(elementWrapper).addClass(&apos;navigation-page-anchor-odd&apos;);
+        }
+    }
+
+    presenter.createPreview = function (view, model) {
+        presenterLogic(view, model);
+        presenter.setVisibility(true);
+    };
+
+    presenter.run = function (view, model) {
+        presenterLogic(view, model);
+        presenter.setVisibility(presenter.configuration.isVisible);
+    };
+
+    presenter.validateModel = function (model) {
+
+        var page = model[&quot;pageNumber&quot;];
+        if (!page) {
+            page = 0;
+        } else {
+            page = parseInt(page);
+            if (isNaN(page)) {
+                return { isError: true, errorCode: &apos;P02&apos; };
+            }
+
+            if (page &lt; 0 ) {
+                return { isError: true, errorCode: &apos;P01&apos; };
+            }
+        }
+        var isVisibleByDefault = ModelValidationUtils.validateBoolean(model[&quot;Is Visible&quot;]);
+
+        var pageName = model[&quot;pageName&quot;];
+        if (!pageName) {
+            pageName = &apos;&apos;;
+        }
+
+        return {
+            isError: false,
+            page: page,
+            name: pageName,
+            isVisibleByDefault: isVisibleByDefault,
+            isVisible: isVisibleByDefault,
+        };
+    };
+
+    presenter.setVisibility = function (isVisible) {
+        presenter.$view.css(&quot;visibility&quot;, isVisible ? &quot;visible&quot; : &quot;hidden&quot;);
+    };
+
+    presenter.executeCommand = function (name, params) {
+        var commands = {
+            &apos;show&apos;: presenter.show,
+            &apos;hide&apos;: presenter.hide,
+            &apos;getName&apos;: presenter.getName
+        };
+
+        Commands.dispatch(commands, name, params, presenter);
+    };
+
+    presenter.getName = function () {
+        return presenter.configuration.name;
+    }
+
+    presenter.show = function () {
+        presenter.setVisibility(true);
+        presenter.configuration.isVisible = true;
+    };
+
+    presenter.hide = function () {
+        presenter.setVisibility(false);
+        presenter.configuration.isVisible = false;
+    };
+
+    presenter.reset = function () {
+        presenter.configuration.isVisible = presenter.configuration.isVisibleByDefault;
+        presenter.setVisibility(presenter.configuration.isVisible);
+    };
+
+    presenter.getState = function () {
+        return JSON.stringify({
+            isVisible: presenter.configuration.isVisible
+        });
+    };
+
+    presenter.setState = function (state) {
+        var isVisible = JSON.parse(state).isVisible;
+
+        presenter.configuration.isVisible = isVisible;
+        presenter.setVisibility(isVisible);
+    };
+
+    return presenter;
+}</presenter></addon>
