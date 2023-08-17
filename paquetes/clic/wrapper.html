@@ -96,9 +96,12 @@
     }
     // Verifica cada 100ms si ya se han obtenido los datos en data. De ser así, carga el iframe con el recurso
     function cargaRecurso() {
+      let timer = 0;
       const interval = setInterval(() => {
-        if (data != '') {
+        timer++;
+        if (data != '' || timer > 20) {
           clearInterval(interval);
+          console.log(timer);
           const iframe = document.createElement('iframe');
           iframe.setAttribute('style', 'height:100vh;width:100vw;border:none');
           iframe.src = tipoRecurso[numRecurso].index;
