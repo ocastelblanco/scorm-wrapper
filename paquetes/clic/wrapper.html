@@ -21,6 +21,7 @@
       action: '',
       value: null
     };
+    let numRecurso = 0;
     API.Initialize = () => {
       obj.action = 'Initialize';
       obj.value = null;
@@ -42,9 +43,11 @@
       data = JSON.stringify(datos);
       obj.action = 'SetValue';
       obj.value = {};
-      if (atributo == 'cmi.suspend_data') valor = JSON.parse(valor);
+      if (atributo == 'cmi.suspend_data' && tipoRecurso[numRecurso].tipo.substring(0, 7) == 'mAuthor') {
+        valor = JSON.parse(valor) ?? valor;
+      }
       obj.value[atributo] = valor;
-      return enviaPostMessage();
+      return valor ? enviaPostMessage() : false;
     }
     API.GetValue = (atributo) => {
       const datos = JSON.parse(data);
@@ -77,7 +80,6 @@
       { tipo: 'Articulate SCORM', index: 'index_lms.html' },
       { tipo: 'Articulate EXPOS', index: 'story.html' }
     ];
-    let numRecurso = 0;
     verificaRecurso();
     function verificaRecurso() {
       const httpRequest = new XMLHttpRequest();

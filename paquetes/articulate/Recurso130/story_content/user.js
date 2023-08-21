@@ -1,4 +1,3 @@
-console.log('Si que estoy');
 function ExecuteScript(strId) {
 	switch (strId) {
 		case "6kgt3SghT3E":
@@ -16,7 +15,7 @@ function ExecuteScript(strId) {
 function Script1() {
 	var player = GetPlayer();
 	var api = SCORM2004_GrabAPI();
-	var dataVisible = api.rol === 'Alumno';
+	var dataVisible = true;// api.rol === 'Alumno';
 	var raw = SCORM2004_GetDataChunk();
 	var data = (raw && raw.substring(0, 1) == '{') ? JSON.parse(raw) : null;
 	if (!data || !data.estado) {
