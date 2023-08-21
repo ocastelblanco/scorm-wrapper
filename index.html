@@ -55,7 +55,7 @@
           // Como parte de la prueba, se aplaza el envío de los datos por 5 segundos para ver si todo funciona bien.
           setTimeout(() => {
             // El objeto que se pase debe tener el cmi.suspend_data (y cualquier conjunto de atributos) en la raíz para ser reconocido
-            console.log('Envío ', obj[recurso]);
+            console.log('PARENT: Envío ', obj[recurso]);
             iframe.contentWindow.postMessage(obj[recurso], '*');
           }, 500);
         }
