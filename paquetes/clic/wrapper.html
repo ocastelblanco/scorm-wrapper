@@ -43,14 +43,13 @@
       data = JSON.stringify(datos);
       obj.action = 'SetValue';
       obj.value = {};
-      if (atributo == 'cmi.suspend_data' && tipoRecurso[numRecurso].tipo.substring(0, 7) == 'mAuthor') {
-        valor = JSON.parse(valor) ?? valor;
-      }
+      //if (atributo == 'cmi.suspend_data') valor = JSON.parse(valor) ?? valor;
       obj.value[atributo] = valor;
       return valor ? enviaPostMessage() : false;
     }
     API.GetValue = (atributo) => {
       const datos = JSON.parse(data);
+      if (atributo == 'cmi.suspend_data') datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
       console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
       return JSON.stringify(datos[atributo]);
     };
@@ -85,10 +84,12 @@
       const httpRequest = new XMLHttpRequest();
       httpRequest.onreadystatechange = () => {
         if (httpRequest.readyState === XMLHttpRequest.DONE) {
+          console.log('WRAPPER: Se verifica si el recurso es de tipo ' + tipoRecurso[numRecurso].tipo);
           if (httpRequest.status === 200) {
             console.log('WRAPPER: El recurso ha sido identificado como ' + tipoRecurso[numRecurso].tipo);
             cargaRecurso();
           } else {
+            console.log('WRAPPER: El recurso de tipo ' + tipoRecurso[numRecurso].tipo + ' no ha sido encontrado.');
             numRecurso++;
             (numRecurso < tipoRecurso.length) ? verificaRecurso(numRecurso) : console.log('WRAPPER: El recurso no ha sido identificado, se aborta toda operación.');
           }

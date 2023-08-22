@@ -18,6 +18,8 @@ function Script1() {
 	var dataVisible = true;// api.rol === 'Alumno';
 	var raw = SCORM2004_GetDataChunk();
 	var data = (raw && raw.substring(0, 1) == '{') ? JSON.parse(raw) : null;
+	console.log('ARTICULATE: raw = ', raw);
+	console.log('ARTICULATE: data = ', data);
 	if (!data || !data.estado) {
 		SCORM2004_ResetStatus();
 		SCORM2004_SetDataChunk('');
