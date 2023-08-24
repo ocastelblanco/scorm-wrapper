@@ -48,9 +48,9 @@
     API.GetValue = (atributo) => {
       let datos = data;
       if (atributo == 'cmi.suspend_data') {
-        // En esta versión NO se hace JSON.parse()
-        //datos = JSON.parse(data);
-        // datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
+        // En esta versión SI se hace JSON.parse() de primer y segundo nivel
+        datos = JSON.parse(data);
+        datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
       }
       console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
       return JSON.stringify(datos[atributo]);
