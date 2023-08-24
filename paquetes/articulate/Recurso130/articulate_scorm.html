@@ -37,7 +37,8 @@
       return enviaPostMessage();
     }
     API.SetValue = (atributo, valor) => {
-      const datos = JSON.parse(data);
+      // Tampoco se hace JSON.parse() para cargar variable
+      const datos = data; // JSON.parse(data);
       datos[atributo] = valor;
       data = JSON.stringify(datos);
       obj.action = 'SetValue';
