@@ -21,7 +21,7 @@
     // Los tipos de ejemplo
     const recursos = ['mauthor', 'articulate', 'clic'];
     // 0 = mAuthor, 1 = Articulate
-    let recurso = recursos[0];
+    let recurso = recursos[2];
     // Un objeto de ejemplo con las tres variables básicas que está esperando el mAuthor y el Articulate. Vienen desde el Backend
     const obj = {
       'mauthor': {
@@ -45,8 +45,8 @@
     };
     // Las rutas URL relativas que cargan el mAuthor o el Articulate
     const rutas = {
-      'mauthor': 'paquetes/mauthor/Recurso700/wrapper.html',
-      'articulate': 'paquetes/articulate/Recurso130/wrapper.html',
+      'mauthor': 'paquetes/mauthor/Recurso700/mauthor.html',
+      'articulate': 'paquetes/articulate/Recurso130/articulate_scorm.html',
       'clic': 'paquetes/clic/wrapper.html'
     };
     // El iframe que contiene el recurso, que se crea dinámicamente y que envía el postMessage apenas se carga.

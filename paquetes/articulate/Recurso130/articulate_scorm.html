@@ -13,7 +13,6 @@
 
 <body style="margin:0">
   <script>
-    // Las mismas funciones del interceptor.js.
     function API_1484_11() { };
     const API = API_1484_11;
     let data = '';
@@ -43,14 +42,13 @@
       data = JSON.stringify(datos);
       obj.action = 'SetValue';
       obj.value = {};
-      //if (atributo == 'cmi.suspend_data') valor = JSON.parse(valor) ?? valor;
       obj.value[atributo] = valor;
       return valor ? enviaPostMessage() : false;
     }
     API.GetValue = (atributo) => {
       const datos = JSON.parse(data);
-      // Se hace JSON.parse() al valor del atributo solicitado, solo si es cmi.suspend_data y es un mAuthor
-      if (atributo == 'cmi.suspend_data' && tipoRecurso[numRecurso].tipo == 'mAuthor') datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
+      // En esta versión NO se hace JSON.parse()
+      // if (atributo == 'cmi.suspend_data') datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
       console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
       return JSON.stringify(datos[atributo]);
     };
@@ -74,31 +72,7 @@
       },
       false
     );
-    // Se comprueba, a partir de una llamada GET si el recurso es un Articulate SCORM (index_lms.html), un mAuthor SCORM (index.html) o un Articulate expositivo (story.html)
-    const tipoRecurso = [
-      { tipo: 'mAuthor', index: 'index.html' },
-      { tipo: 'Articulate SCORM', index: 'index_lms.html' },
-      { tipo: 'Articulate EXPOS', index: 'story.html' }
-    ];
-    verificaRecurso();
-    function verificaRecurso() {
-      const httpRequest = new XMLHttpRequest();
-      httpRequest.onreadystatechange = () => {
-        if (httpRequest.readyState === XMLHttpRequest.DONE) {
-          console.log('WRAPPER: Se verifica si el recurso es de tipo ' + tipoRecurso[numRecurso].tipo);
-          if (httpRequest.status === 200) {
-            console.log('WRAPPER: El recurso ha sido identificado como ' + tipoRecurso[numRecurso].tipo);
-            cargaRecurso();
-          } else {
-            console.log('WRAPPER: El recurso de tipo ' + tipoRecurso[numRecurso].tipo + ' no ha sido encontrado.');
-            numRecurso++;
-            (numRecurso < tipoRecurso.length) ? verificaRecurso(numRecurso) : console.log('WRAPPER: El recurso no ha sido identificado, se aborta toda operación.');
-          }
-        }
-      }
-      httpRequest.open('GET', tipoRecurso[numRecurso].index);
-      httpRequest.send();
-    }
+    cargaRecurso();
     // Verifica cada 100ms si ya se han obtenido los datos en data. De ser así, carga el iframe con el recurso
     function cargaRecurso() {
       let timer = 0;
@@ -108,9 +82,10 @@
           clearInterval(interval);
           const iframe = document.createElement('iframe');
           iframe.setAttribute('style', 'height:100vh;width:100vw;border:none');
-          iframe.src = tipoRecurso[numRecurso].index;
+          iframe.src = 'index_lms.html';
           document.body.appendChild(iframe);
           iframe.onload = () => {
+            // Se detecta el click en cualquier elemento; si es un <a> se envía la información por PostMessage
             iframe.contentWindow.document.addEventListener('click', (ev) => {
               ev.stopImmediatePropagation();
               ev.preventDefault();
