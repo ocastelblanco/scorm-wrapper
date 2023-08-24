@@ -37,9 +37,8 @@
       return enviaPostMessage();
     }
     API.SetValue = (atributo, valor) => {
-      // Tampoco se hace JSON.parse() para cargar variable
-      const datos = data; // JSON.parse(data);
-      datos[atributo] = valor;
+      let datos = data;
+      if (atributo == 'cmi.suspend_data') datos[atributo] = JSON.stringify(valor) ?? valor;
       data = JSON.stringify(datos);
       obj.action = 'SetValue';
       obj.value = {};
@@ -48,11 +47,7 @@
     }
     API.GetValue = (atributo) => {
       let datos = data;
-      if (atributo == 'cmi.suspend_data') {
-        // En esta versión NO se hace JSON.parse()
-        //datos = JSON.parse(data);
-        // datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
-      }
+      if (atributo == 'cmi.suspend_data') datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
       console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
       return JSON.stringify(datos[atributo]);
     };
