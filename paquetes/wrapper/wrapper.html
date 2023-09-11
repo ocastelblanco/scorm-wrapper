@@ -13,6 +13,13 @@
 
 <body style="margin:0">
   <script>
+    // Obtiene las variables GET enviadas a este HTML
+    // Se debe enviar una query a este HTML con dos variables: ruta y tipo.
+    // Algo como wrapper.html?ruta=../mauthor/Recurso700/index.html&tipo=mauthor
+    const parsedURL = new URL(window.location.href);
+    const ruta = parsedURL.searchParams.get('ruta') ?? getValor('ruta');
+    const tipo = parsedURL.searchParams.get('tipo') ?? getValor('tipo');
+    // Simula la API SCORM
     function API_1484_11() { };
     const API = API_1484_11;
     let data = '';
@@ -37,8 +44,8 @@
       return enviaPostMessage();
     }
     API.SetValue = (atributo, valor) => {
-      let datos = data;
-      if (atributo == 'cmi.suspend_data') datos[atributo] = JSON.stringify(valor) ?? valor;
+      const datos = JSON.parse(data);
+      datos[atributo] = valor;
       data = JSON.stringify(datos);
       obj.action = 'SetValue';
       obj.value = {};
@@ -46,8 +53,9 @@
       return valor ? enviaPostMessage() : false;
     }
     API.GetValue = (atributo) => {
-      let datos = data;
-      if (atributo == 'cmi.suspend_data') datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
+      const datos = JSON.parse(data);
+      // Se hace JSON.parse() al valor del atributo solicitado, solo si es cmi.suspend_data y es un mAuthor
+      if (atributo == 'cmi.suspend_data' && tipo == 'mauthor') datos[atributo] = JSON.parse(datos[atributo]) ?? datos[atributo];
       console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
       return JSON.stringify(datos[atributo]);
     };
@@ -81,10 +89,9 @@
           clearInterval(interval);
           const iframe = document.createElement('iframe');
           iframe.setAttribute('style', 'height:100vh;width:100vw;border:none');
-          iframe.src = 'index_lms.html';
+          iframe.src = ruta;
           document.body.appendChild(iframe);
           iframe.onload = () => {
-            // Se detecta el click en cualquier elemento; si es un <a> se envía la información por PostMessage
             iframe.contentWindow.document.addEventListener('click', (ev) => {
               ev.stopImmediatePropagation();
               ev.preventDefault();
@@ -103,6 +110,11 @@
           };
         }
       }, 100);
+    }
+    // Funciones auxiliares
+    function getValor(key) { // Obtiene el valor de una variable GET, a partir de la key, para navegadores que no tienen la API URL definida en https://developer.mozilla.org/en-US/docs/Web/API/URL
+      if (key = (new RegExp('[?&]' + encodeURIComponent(key) + '=([^&]*)')).exec(location.search))
+        return decodeURIComponent(key[1]);
     }
   </script>
 </body>

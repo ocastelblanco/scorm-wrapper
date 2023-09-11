@@ -3,6 +3,13 @@
 
 <head>
   <title>Parent ejemplo</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9"
+        crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-HwwvtgBNo3bZJJLYd8oVXjrBZt8cqVSpeBNS5n7C8IVInixGAoxmnlMuBnhbgrkm"
+          crossorigin="anonymous"></script>
   <style>
     body {
       margin: 0;
@@ -12,16 +19,90 @@
       width: 100vw;
       height: 100vh;
       border: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 2;
+    }
+
+    .selector {
+      position: fixed;
+      top: 0;
+      left: 0;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      z-index: 3;
+    }
+
+    .btn-group {
+      background-color: white;
+    }
+
+    .spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+
+    .spinner-border {
+      width: 50px;
+      height: 50px;
     }
   </style>
 </head>
 
 <body>
+  <div class="spinner">
+    <div class="spinner-border text-primary"
+         role="status">
+      <span class="visually-hidden">Cargando...</span>
+    </div>
+  </div>
+  <div class="selector container-fluid">
+    <div class="btn-group"
+         role="group"
+         aria-label="Basic radio toggle button group">
+      <input type="radio"
+             class="btn-check"
+             name="btnradio"
+             id="btnradio1"
+             autocomplete="off"
+             onclick="cambiaRecurso(0)"
+             checked>
+      <label class="btn btn-outline-primary"
+             for="btnradio1">mAuthor</label>
+
+      <input type="radio"
+             class="btn-check"
+             name="btnradio"
+             id="btnradio2"
+             onclick="cambiaRecurso(1)"
+             autocomplete="off">
+      <label class="btn btn-outline-primary"
+             for="btnradio2">Articulate</label>
+
+      <input type="radio"
+             class="btn-check"
+             name="btnradio"
+             id="btnradio3"
+             onclick="cambiaRecurso(2)"
+             autocomplete="off">
+      <label class="btn btn-outline-primary"
+             for="btnradio3">Capturador de clics</label>
+    </div>
+  </div>
   <script>
     // Los tipos de ejemplo
     const recursos = ['mauthor', 'articulate', 'clic'];
     // 0 = mAuthor, 1 = Articulate
-    let recurso = recursos[2];
+    let recurso = recursos[0];
     // Un objeto de ejemplo con las tres variables básicas que está esperando el mAuthor y el Articulate. Vienen desde el Backend
     const obj = {
       'mauthor': {
@@ -45,16 +126,20 @@
     };
     // Las rutas URL relativas que cargan el mAuthor o el Articulate
     const rutas = {
-      'mauthor': 'paquetes/mauthor/Recurso700/mauthor.html',
-      'articulate': 'paquetes/articulate/Recurso130/articulate_scorm.html',
-      'clic': 'paquetes/clic/wrapper.html'
+      'mauthor': 'mauthor/Recurso700/index.html&tipo=mauthor',
+      'articulate': 'articulate/Recurso130/index_lms.html&tipo=articulate',
+      'clic': 'clic/story.html&tipo=clic'
     };
+    const rutaWrapper = 'paquetes/wrapper/wrapper.html?ruta=../';
     // El iframe que contiene el recurso, que se crea dinámicamente y que envía el postMessage apenas se carga.
-    const iframe = document.createElement('iframe');
-    iframe.onload = cargaIframe();
-    iframe.src = rutas[recurso];
-    document.body.appendChild(iframe);
-    function cargaIframe() {
+    creaIframe();
+    function creaIframe() {
+      const iframe = document.createElement('iframe');
+      iframe.onload = cargaIframe(iframe);
+      iframe.src = rutaWrapper + rutas[recurso];
+      document.body.appendChild(iframe);
+    }
+    function cargaIframe(iframe) {
       // Se tiene que esperar a cargar el iframe, pero no se puede enviar el postMessage después de cargadas las variables iniciales.
       const interval = setInterval(() => {
         if (iframe.contentWindow) {
@@ -77,6 +162,12 @@
       },
       false
     );
+    function cambiaRecurso(num) {
+      const iframe = document.getElementsByTagName('iframe')[0];
+      document.body.removeChild(iframe);
+      recurso = recursos[num];
+      creaIframe();
+    }
   </script>
 </body>
 
