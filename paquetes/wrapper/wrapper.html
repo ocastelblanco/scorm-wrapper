@@ -53,8 +53,7 @@
         obj.value[atributo] = valor;
         return valor ? enviaPostMessage() : false;
       } catch (e) {
-        console.log('ERROR WRAPPER: SetValue - Al momento de enviar (' + atributo + ', ' + valor + ') el estado de los datos es', data);
-        console.log('ERROR WRAPPER: SetValue - El error reportado es ', e);
+        console.log('WRAPPER: SetValue - El atributo ' + atributo + ' no se ha enviado porque está vacío o no se ha podido obtener su valor.');
         return false;
       }
     }
@@ -66,9 +65,8 @@
         console.log('WRAPPER: GetValue ' + atributo + ': ', datos[atributo]);
         return JSON.stringify(datos[atributo]);
       } catch (e) {
-        console.log('ERROR WRAPPER: GetValue - Al momento de solicitar ' + atributo + ' el estado de los datos es', data);
-        console.log('ERROR WRAPPER: GetValue - El error reportado es ', e);
-        return false;
+        console.log('WRAPPER: GetValue - El atributo ' + atributo + ' se inicia correctamente vacío.');
+        return null;
       }
     };
     API.GetLastError = () => {

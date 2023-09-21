@@ -105,6 +105,14 @@
     let recurso = recursos[0];
     // Un objeto de ejemplo con las tres variables básicas que está esperando el mAuthor y el Articulate. Vienen desde el Backend
     const obj = {
+      /*
+      'mauthor': {
+        "cmi.suspend_data": "",
+        "cmi.location": "",
+        "cmi.completion_status": ""
+      },
+      //*/
+      //*
       'mauthor': {
         "cmi.score.max": "100",
         "cmi.mode": "normal",
@@ -117,11 +125,21 @@
         "cmi.completion_status": "incomplete",
         "cmi.score.scaled": "0,28"
       },
+      //*/
+      /*
       'articulate': {
         'cmi.suspend_data': { "estado": "incompleto", "valores": { "resp_01": "Mi reino por un caballo.", "resp_02": "Crear herramientas con la imaginación." } },
         'cmi.completion_status': "incomplete",
         'cmi.success_status': 'unknown'
       },
+      //*/
+      //*
+      'articulate': {
+        'cmi.suspend_data': {},
+        'cmi.completion_status': "",
+        'cmi.success_status': ''
+      },
+      //*/
       'clic': { 'cmi.suspend_data': 'Datos dummy' }
     };
     // Las rutas URL relativas que cargan el mAuthor o el Articulate
