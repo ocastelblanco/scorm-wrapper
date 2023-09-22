@@ -53,7 +53,7 @@
         obj.value[atributo] = valor;
         return valor ? enviaPostMessage() : false;
       } catch (e) {
-        console.log('WRAPPER: SetValue - El atributo ' + atributo + ' no se ha enviado porque está vacío o no se ha podido obtener su valor.');
+        console.log('WRAPPER: SetValue - El atributo ' + atributo + ' está vacío o no se ha podido obtener su valor.');
         return false;
       }
     }
@@ -82,7 +82,7 @@
     window.addEventListener(
       "message",
       (event) => {
-        if (typeof event.data == 'object' && event.data['cmi.suspend_data']) {
+        if (typeof event.data == 'object' && event.data.hasOwnProperty('cmi.suspend_data')) {
           console.log('WRAPPER: Recibo datos del PARENT = ', event.data);
           data = JSON.stringify(event.data ?? {});
         }
