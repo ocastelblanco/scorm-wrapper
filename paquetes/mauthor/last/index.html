@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width">
+    <title>LC_07_01_LL_01_R02 - mauthor.com</title>
+    <script type="text/javascript">
+        const USE_SCORM = true;
+        const USE_XAPI = false;
+        const XAPI_WITH_SUBMIT_BUTTON = false;
+        var FIT_FULL_PAGE = false;
+
+        function addScript(path) {
+            let script = document.createElement('script');
+            script.src = path;
+            document.write(script.outerHTML);
+        }
+    </script>
+
+    <script>
+        addScript('javascript/jquery-1.7.1.min.js');
+        addScript('javascript/semi-responsive-layout-chooser.js');
+        addScript('icplayer/icplayer.nocache.js');
+        addScript('javascript/screen.js');
+
+        if (USE_SCORM) {
+            addScript('javascript/mauthor_scorm.js');
+        }
+        if (USE_XAPI) {
+            addScript('javascript/mauthor_xapi.js');
+        }
+        let mathJaxScript = document.createElement('script');
+        mathJaxScript.type = 'text/x-mathjax-config';
+        
+        mathJaxScript.innerHTML = `
+        MathJax.Hub.Config({
+            TeX: {imageFont: null, extensions: ["mhchem.js", "AMSsymbols.js", "AMSmath.js"]},
+            extensions: ["tex2jax.js", "mml2jax.js", "forminput.js"],
+            skipStartupTypeset: true,
+            showProcessingMessages: false,
+            jax: ["input/TeX", "input/MathML", "output/HTML-CSS"],
+            playerObject: "player"
+          });`;
+        
+        document.write(mathJaxScript.outerHTML);
+        addScript('javascript/MathJax/MathJax.js');
+    </script>
+
+    <style>
+        .no-margin {
+            margin: 0;
+            padding: 0;
+        }
+
+        .pull-left {
+            float: left;
+        }
+
+        .clear {
+            clear: both;
+        }
+    </style>
+    <script>
+  function chooseLayout(layoutChooser, screenConfiguration) {
+    var isMobile = screenConfiguration.orientation !== window.mAuthor.ScreenUtils.ORIENTATION_TYPES.NOT_MOBILE;
+    var isVertical = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.PORTRAIT;
+    var isHorizontal = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.LANDSCAPE;
+
+    return layoutChooser.chooseLayout(screenConfiguration.width, isMobile, isVertical, isHorizontal);
+  }
+
+</script>
+
+    <script type="text/javascript">
+        var player;
+        var scorm;
+        var start;
+        var xapi;
+        var semiResponsiveLayoutChooser;
+        var userAgent = window.navigator.userAgent;
+        var viewPort = document.querySelector("meta[name=viewport]");
+        var $contentView;
+        var $content;
+        var isMobile = window.mAuthor.ScreenUtils.isMobileUserAgent(userAgent);
+        var passingScore = null; // this will be set when first page will be loaded
+
+        if (USE_XAPI) {
+            var tincanCfg = {
+                entry: "ab-initio",
+                lessonIRI: "",
+                lessonTitle: "",
+                courseIRI: "",
+                lessonDescription: "",
+                
+                actor: {
+                    account: {
+                        homePage: "http://example.lms.com/",
+                        name: "Anonymous"
+                    }
+                }
+            };
+        }
+
+        function fromUtf8ToBase64(text) {
+            var parsedText = CryptoJS.enc.Utf8.parse(text);
+            return CryptoJS.enc.Base64.stringify(parsedText);
+        }
+
+        function fromBase64ToUtf16(base64EncodedString) {
+            var decodedBase64Text = CryptoJS.enc.Base64.parse(base64EncodedString);
+            return CryptoJS.enc.Utf8.stringify(decodedBase64Text);
+        }
+
+        function getOpener() {
+            var parent = null;
+            if (window.parent != null && window.parent.postMessage != null) {
+                parent = window.parent;
+            }
+            if (window.opener != null && window.opener.postMessage != null) {
+                parent = window.opener;
+            }
+            return parent;
+        }
+
+        function getLessonSize() {
+            var $icPlayer = $('#_icplayer');
+            var width = parseInt($icPlayer.css('width'), 10);
+            var height = parseInt($icPlayer.css('height'), 10);
+
+            return {
+                'width': width,
+                'height': height
+            }
+        }
+
+        function postResizeMessage(width, height) {
+            const parent = getOpener();
+
+            if (parent != null) {
+                var message = "RESIZE:" + width + ";" + height;
+                parent.postMessage(message, '*');
+            }
+            setTimeout(() => {
+                loadCurrentScaleAndShareWithPlayer();
+            }, 60);
+        }
+
+        function postPageLoadedMessage() {
+            var parent = getOpener();
+
+            if (parent != null) {
+                var message = "PAGE_LOADED";
+                parent.postMessage(message, '*');
+            }
+        }
+
+        // Possible remove, because on mobile this block resize after rotate. But this also need to work for Fit Full Page.
+        function chooseLayout(layoutChooser, screenConfiguration) {
+            var isMobile = screenConfiguration.orientation !== window.mAuthor.ScreenUtils.ORIENTATION_TYPES.NOT_MOBILE;
+            var isVertical = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.PORTRAIT;
+            var isHorizontal = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.LANDSCAPE;
+
+            return layoutChooser.chooseLayout(screenConfiguration.width, isMobile, isVertical, isHorizontal);
+        }
+
+        function setViewPortSizesAfterScreenChanges() {
+            //  var $icPlayer = $('#_icplayer');
+            //  var width = parseInt($icPlayer.css('width'), 10);
+            var width = getLessonSize().width;
+            viewPort.setAttribute('content', 'width=' + width + ',maximum-scale=1');
+        }
+
+        function onResizeHandler() {
+            if (isMobile && !FIT_FULL_PAGE) {
+                var size = getLessonSize();
+                scaleIframe(size.width, size.height);
+            }
+            if (FIT_FULL_PAGE) {
+                iframeResizeRequest();
+                loadCurrentScaleAndShareWithPlayer();
+            }
+
+            var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+            var layoutID = chooseLayout(semiResponsiveLayoutChooser, screenSizes);
+            var changed = player.changeLayout(layoutID);
+            if (changed) {
+                setViewPortSizesAfterScreenChanges();
+            }
+        }
+
+        function setScaleInformation(width, height, scale) {
+            var scaleX = $contentView[0].getBoundingClientRect().width / width;
+            var scaleY = $contentView[0].getBoundingClientRect().height / height;
+
+            var scaleInformation = {
+                scaleX: scaleX,
+                scaleY: scaleY,
+                transform: 'scale(' + scale + ')',
+                transformOrigin: 'top left'
+            };
+
+            player.getPlayerServices().setScaleInformation(scaleInformation);
+        }
+
+        function matchDraggableGrabAndDropScaling() {
+            $content.css('transform-origin', 'center top');
+            $content.css('-webkit-transform-origin', 'center top');
+            $contentView.css({
+                "justify-content": "center",
+                "display": "flex"
+            });
+            $contentView.height('100vh');
+            $contentView.width('100vw');
+        }
+
+        function scaleIframe(width, height, scale = null) {
+            var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+            var windowWidth = screenSizes.width;
+
+            if (!scale) {
+                scale = windowWidth / width;
+            }
+
+            var newWidth = scale * width;
+            var newHeight = scale * height;
+
+            $contentView.width(newWidth);
+            $contentView.height(newHeight);
+            $contentView.css({
+                "overflow": "hidden"
+            });
+
+            var $scrollableContent = $("#scrollableBody");
+
+            if (FIT_FULL_PAGE) {
+                matchDraggableGrabAndDropScaling();
+            } else {
+                $scrollableContent.width(newWidth);
+                $scrollableContent.height(newHeight);
+            }
+
+            viewPort.setAttribute('content', getViewPortContent(userAgent, newWidth));
+            setScaleInformation(width, height, scale);
+        }
+
+        function getViewPortContent(ua, width) {
+            if (!(/iPhone|iPad|iPod/.test(navigator.platform) && /OS [1-5]_[0-9_]* like Mac OS X/i.test(ua) && ua.indexOf("AppleWebKit") > -1)) {
+                var contentTag = viewPort.getAttribute('content');
+                var newContent = contentTag.replace(/width=[^,]+/, 'width=' + width);
+                return newContent;
+            } else {
+                return 'width=' + width;
+            }
+        }
+
+        function receiveMessage(event) {
+            const WINDOW_WIDTH_EVENT = "WINDOW_WIDTH:";
+            const SET_PLAYER_STATE = "PLAYER_STATE:";
+            const LOAD_LESSON = "LOAD_LESSON";
+            const RESIZE = "RESIZE";
+
+            if (!event.data || typeof(event.data) !== 'string') {
+                return;
+            }
+
+            if (event.data.indexOf(WINDOW_WIDTH_EVENT) === 0) {
+                if (semiResponsiveLayoutChooser) {
+                    var screenConfiguration = JSON.parse(event.data.substring(WINDOW_WIDTH_EVENT.length, event.data.length));
+                    var layoutID = chooseLayout(semiResponsiveLayoutChooser, screenConfiguration);
+                    var changed = player.changeLayout(layoutID);
+                }
+            }
+
+            if (event.data.indexOf(SET_PLAYER_STATE) === 0) {
+                const playerState = event.data.substring(SET_PLAYER_STATE.length, event.data.length);
+                if (playerState !== '') {
+                    player.setState(playerState);
+                }
+            }
+
+            if (event.data.indexOf(LOAD_LESSON) === 0) {
+                loadLesson(true);
+            }
+
+            if (event.data.indexOf(RESIZE) === 0) {
+                loadCurrentScaleAndShareWithPlayer();
+            }
+        }
+
+        function iframeResizeRequest() {
+            if (window.parent != null && window.parent.postMessage != null) {
+                const size = getLessonSize();
+                setViewPortSizesAfterScreenChanges();
+                postResizeMessage(size.width, size.height);
+            }
+        }
+
+        function recalculateScaling() {
+            iframeResizeRequest();
+            if (!FIT_FULL_PAGE) {
+                $("#scrollableBody").css({
+                    "overflow": "",
+                    "height": ""
+                });
+            }
+
+            if (isMobile && !FIT_FULL_PAGE) {
+                const size = getLessonSize();
+                scaleIframe(size.width, size.height);
+            }
+            if (FIT_FULL_PAGE) {
+                loadCurrentScaleAndShareWithPlayer();
+            }
+        }
+
+        function setBodyWidthToFullViewportWidth() {
+            // Iphone/Ipad rotation not refresh html width if default is none
+            const main_body = document.getElementsByTagName('body')[0];
+
+            main_body.style.height = isIOS() ? "100dvh" : "100vh";
+            main_body.style.width = "100vw";
+            main_body.style.overflow = "hidden";
+        }
+
+        function isIOS() {
+            const userAgent = window.navigator.userAgent;
+            const mobileAgent = userAgent.match(/iPhone|iPad|iPod/i) ||
+                (userAgent.match(/Mac/) && window.navigator.maxTouchPoints && window.navigator.maxTouchPoints > 2);
+
+            return !!mobileAgent;
+        }
+
+        function icOnAppLoaded() {
+            if (FIT_FULL_PAGE) {
+                setBodyWidthToFullViewportWidth();
+            }
+            player = icCreatePlayer('_icplayer');
+
+            if (USE_XAPI) {
+                initializeXApi();
+
+            }
+            const searchParams = new URLSearchParams(window.location.search);
+            const waitParam = searchParams.get('wait');
+            if (!waitParam || waitParam.toLowerCase() !== 'yes') {
+                loadLesson();
+            }
+
+            $contentView = $('#content-view');
+            $content = $('#content');
+
+            var firstPageLoaded = false;
+            var orientationChangeHandlerAdded = false;
+            var debounceTimeoutID = null;
+            var currentScore = 0;
+            var previousPageNumber = 1;
+
+            if (!isMobile || FIT_FULL_PAGE) {
+                // this moves the lesson to the center of screen on PC
+                $("#scrollableBody").css({'display': 'flex', 'justify-content': 'center'});
+            }
+
+            player.onPageLoaded(function onPageLoadedHandler() {
+                
+                    isAttemptSaved = false;
+                
+                start = start || new Date().getTime();
+
+                if (!firstPageLoaded) {
+                    semiResponsiveLayoutChooser = new window.semiResponsive.LayoutChooser(player.getSemiResponsiveLayouts());
+                    passingScore = parseInt(player.getPlayerServices().getContentMetadataValue('passingScore'), 10);
+                    if (isNaN(passingScore)) {
+                        passingScore = 0;
+                    }
+
+                    var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+
+                    var layoutID = chooseLayout(semiResponsiveLayoutChooser, screenSizes);
+                    player.changeLayout(layoutID);
+
+                    firstPageLoaded = true;
+
+                    window.addEventListener('orientationchange', onResizeHandler);
+                    window.addEventListener("resize", onResizeHandler, false);
+
+                    player.getPlayerServices().getObserverService().addObserver("save", {
+                        next: function () {
+                            if (USE_SCORM) {
+                                sendSCORMScore(false);
+                            }
+                        }
+                    });
+
+                } else {
+                    if (USE_XAPI) {
+                        // do this only if this isn't first page
+                        getAndSendXAPIPageScore(previousPageNumber);
+                        previousPageNumber = player.getPlayerServices().getCurrentPageIndex() + 1;
+                    }
+                }
+                postPageLoadedMessage();
+
+                let valueChangedHandler = undefined;
+                if (USE_XAPI) {
+                    valueChangedHandler = getValueChangeHandlerForXApi();
+                } else {
+                    // event bus handlers are cleared on each page change, so they should be set on each page load
+                    valueChangedHandler = {
+                        onEventReceived: function () {
+                            var utils = new PlayerUtils(player);
+                            var presentation = utils.getPresentation();
+                            var newScoreValue = utils.getPresentationScore(presentation).scaledScore;
+
+                            // if score changed send now
+                            if (newScoreValue != currentScore) {
+                                if (USE_SCORM) {
+                                    sendSCORMScore(false);
+                                }
+                                window.clearTimeout(debounceTimeoutID);
+                                debounceTimeoutID = null;
+                                currentScore = newScoreValue;
+                            } else {
+                                // update 30 seconds after event came
+                                if (debounceTimeoutID === null) {
+                                    debounceTimeoutID = window.setTimeout(function () {
+                                        if (USE_SCORM) {
+                                            sendSCORMScore(false);
+                                        }
+                                        debounceTimeoutID = null;
+                                    }, 30000);
+                                }
+                            }
+                        }
+                    };
+                }
+                const playerEventBus = player.getPlayerServices().getEventBus();
+                playerEventBus.addEventListener('ValueChanged', valueChangedHandler);
+
+                (function () {
+                    var scrollDetectorInterval = null;
+                    var retries = 0;
+
+                    function scrollAddIfBodyBiggerThanWindow() {
+                        var $window = $(window);
+                        var $icplayerDiv = $("#_icplayer");
+                        var $scrollableContent = $("#scrollableBody");
+
+                        var windowHeight = $window.height();
+                        var windowWidth = $window.width();
+
+                        var bodyHeight = $icplayerDiv.height();
+                        var bodyWidth = $icplayerDiv.width();
+
+                        if (!FIT_FULL_PAGE) {
+                            if (windowHeight < bodyHeight || windowWidth < bodyWidth) {
+                                $scrollableContent.css("overflow", "auto");
+                            } else if (windowHeight >= bodyHeight && windowWidth >= bodyWidth) {
+                                $scrollableContent.css("height", "");
+                                $scrollableContent.css("overflow", "");
+                            } else if (windowHeight >= bodyHeight) {
+                                $scrollableContent.css("height", "");
+                            }
+                        }
+
+                        retries++;
+                        if (retries > 5) {
+                            window.clearInterval(scrollDetectorInterval);
+                        }
+                    }
+
+                    $(document).ready(function () {
+                        if (scrollDetectorInterval == null && !FIT_FULL_PAGE) {
+                            scrollDetectorInterval = setInterval(scrollAddIfBodyBiggerThanWindow, 1000);
+                        }
+                        if (FIT_FULL_PAGE) {
+                            recalculateScaling();
+                        }
+                    });
+
+                    if (!orientationChangeHandlerAdded) {
+                        orientationChangeHandlerAdded = true;
+                        // when orientation changes there is a need to set scrollableContent height again
+                        window.addEventListener('orientationchange', function () {
+                            // values of window height/width may not be updated immediately after orientation change
+                            setTimeout(scrollAddIfBodyBiggerThanWindow, 1000);
+                        });
+                    }
+                })();
+            });
+
+            player.onOutstretchHeight(function () {
+                iframeResizeRequest();
+            });
+
+            player.onPageScrollTo(function (top) {
+                const parent = getOpener();
+                if (parent) {
+                    parent.postMessage('SCROLLTOP:' + top, "*");
+                }
+            });
+
+
+            window.addEventListener("message", receiveMessage, false);
+
+            let savedState = undefined;
+            if (USE_SCORM) {
+                scorm = getScorm();
+                const result = scorm.initializeScormCommunication(window);
+                if (result === false) {
+                    scorm = getScorm_1_2();
+                    scorm.initializeScormCommunication(window);
+                }
+                savedState = scorm.loadState();
+            }
+            if (savedState) {
+                player.setState(savedState);
+            }
+            let scorm_location = false;
+            if (USE_SCORM) {
+                scorm_location = scorm.loadLocation();
+            }
+            if (scorm_location === false) {
+                scorm_location = '0';
+            }
+        }
+
+        function registerEventListeners() {
+            // event pagehide doesn't work properly in Chrome browser when the document is in iframe
+            if (USE_SCORM) {
+                listenWindowEventsScorm();
+            }
+            if (USE_XAPI) {
+                listenWindowEventsXApi();
+            }
+        }
+
+        function loadLesson(manual = false) {
+            if (manual) {
+                const icPlayer = document.getElementById("_icplayer");
+                const icPlayerTables = icPlayer.getElementsByClassName('ic_player');
+                if (icPlayerTables.length > 0) {
+                    icPlayerTables[0].remove();
+                }
+            }
+            player.load('pages/main.xml', parseInt(location));
+        }
+
+        function doStart() {
+            registerEventListeners();
+        }
+
+        /**
+         * Checks if all reportable pages from lesson were visited by student
+         * @param {object} presentation - presentation object returned from PlayerServices
+         * @return {boolean} True if all pages were visited, False otherwise
+         * */
+        function checkAllReportablePagesVisited(presentation) {
+            var page = null;
+            var pagesCount = presentation.getPageCount();
+
+            for (var i = 0; i < pagesCount; i++) {
+                page = presentation.getPage(i);
+
+                if (page.isReportable() && !page.isVisited()) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        function loadCurrentScaleAndShareWithPlayer() {
+            const appWidth = document.getElementById("scrollableBody").offsetWidth;
+            let appHeight = isIOS() ? getIOSHeight(appWidth) : window.innerHeight + 10;
+            if(XAPI_WITH_SUBMIT_BUTTON){
+                appHeight = window.innerHeight + 10 - 80;
+            }
+
+            const icplayerContent = document.getElementById("_icplayer");
+            const widthEquation = appWidth / icplayerContent.offsetWidth - 0.015;
+            const heightEquation = appHeight / icplayerContent.offsetHeight - 0.015;
+            const scale = widthEquation < heightEquation ? widthEquation : heightEquation;
+
+            const scaleInformation = {
+                scaleX: scale,
+                scaleY: scale,
+                transform: 'scale(' + scale + ')',
+                transformOrigin: 'center top'
+            };
+
+            player.getPlayerServices().setScaleInformation(scaleInformation);
+            if (FIT_FULL_PAGE) {
+                const widthIframe = window.visualViewport.width / scale;
+                const heightIframe = window.visualViewport.height / scale;
+                scaleIframe(widthIframe, heightIframe, scale);
+            }
+        }
+
+        function getIOSHeight(contentWidth) {
+            const contentHeight = document.getElementById("scrollableBody").offsetHeight;
+
+            // return content height for vertical position
+            if (contentHeight > contentWidth) {
+                return contentHeight
+            }
+
+            // fix for iPhone 15 with 16.5-17.3 iOS
+            if (contentHeight / window.innerHeight > 2) {
+                return contentHeight - 50;
+            }
+
+            return window.innerHeight;
+        }
+    </script>
+</head>
+
+<body class="no-margin" onload="doStart();">
+
+
+<div id="scrollableBody">
+    <div id="content-view">
+        <div id="content">
+            <div id="_icplayer" class="no-margin pull-left"></div>
+            <div class="clear"></div>
+        </div>
+    </div>
+</div>
+</body>
+
+
+</html>

@@ -1,0 +1,227 @@
+<?xml version='1.0' encoding='UTF-8' ?><addon id='template_commons_util'><metadata></metadata><model></model><resources></resources><css></css><view></view><preview>&lt;p&gt;Template utils&lt;/p&gt;</preview><presenter>function Addontemplate_commons_util_create() {
+    var presenter = function () {
+    };
+
+    var isResizing = false;
+
+    presenter.STANDARD_EVENTS = [
+        &apos;PageLoaded&apos;,
+        &apos;ScrollEvent&apos;,
+        &apos;ResizeWindow&apos;
+    ];
+
+    presenter.onEventReceived = function (eventName, eventData) {
+        if (eventName == &quot;PageLoaded&quot;) {
+            var pageCount = presenter.playerController.getPresentation().getPageCount();
+
+            if (pageCount == 1) {
+                var navModule = presenter.playerController.getHeaderModule(&apos;__navigation_bar&apos;);
+                if(navModule) {
+                    $(navModule.getView()).hide();
+                }
+            }
+
+            // you must repeat the data reading when they are not loaded correctly
+            setTimeout(function (e) {
+                // Recalculate Iframe
+                if (window.isFrameInDifferentDomain || window.isInIframe) {
+                    var $iframe = $ (window.parent.document.getElementById(&apos;content-iframe&apos;));
+                    var height = parseInt ($iframe.css (&apos;height&apos;), 10);
+                    postIFrameMessage (window.parent, height); 
+                }
+                resize();
+            }, 200);
+
+            resize();
+        } else if (eventName == &quot;ScrollEvent&quot;) {
+            presenter.playerController.getEventBus().sendEvent(&apos;CustomScrollEvent&apos;, {value: eventData.value});
+
+            if (!isResizing) {
+                isResizing = true;
+                setTimeout(function (e) {
+                    resize();
+                    isResizing = false;
+                }, 100);
+            }
+        } else if (eventName == &quot;ResizeWindow&quot;) {
+            if (!isResizing) {
+                isResizing = true;
+                setTimeout(function (e) {
+                    resize();
+                    isResizing = false;
+                }, 100);
+            }
+        } 
+    }; 
+
+    presenter.setPlayerController = function (controller) {
+        presenter.playerController = controller;
+    };
+
+    presenter.destroy = function AddonAnimation_destroy() {
+        window.removeEventListener(&apos;resize&apos;, resize);
+        $(&quot;.ic_header&quot;).parents().off(&apos;scroll&apos;, scroll);
+    };
+
+    presenter.run = function(view, model) {
+        console.log(&quot;Addontemplate_commons_util_create&quot;);
+
+        var eventBus = presenter.playerController.getEventBus();
+
+        if (!window.isInitTemplateCommonsUtil) {
+            // FIX mAuthor resize scaled events for scroll navigation
+            if (!window.isFrameInDifferentDomain &amp;&amp; window.isInIframe) {
+                try {
+                    iframeEvents(window.parent);
+                } catch (e) {
+                    
+                }
+            } else {
+                windowEvents();
+            }
+            window.isInitTemplateCommonsUtil = true;
+        }
+
+        window.addEventListener(&apos;resize&apos;, resize);
+        $(&quot;.ic_header&quot;).parents().on(&apos;scroll&apos;, scroll);
+
+        $.each(presenter.STANDARD_EVENTS, function(_, name) {
+            eventBus.addEventListener(name, presenter);
+        });
+
+        $(view).css(&apos;visibility&apos;, &apos;hidden&apos;);
+    };
+
+    function scroll(e) {
+        var scrollTop = $(e.currentTarget).scrollTop();
+        presenter.playerController.getEventBus().sendEvent(&apos;CustomScrollEvent&apos;, {value: scrollTop});
+    }
+
+    function resize() {
+        var navItems = 6;
+        var navModule = presenter.playerController.getHeaderModule(&apos;__navigation_bar&apos;);
+        navModule = navModule ? navModule : presenter.playerController.getHeaderModule(&apos;__navigation_bar_anchor&apos;);
+        if (navModule) {
+            navItems = $(navModule.getView()).find(&quot;span&quot;).length;
+            $(navModule.getView()).css({&quot;width&quot; : &quot;40px&quot;, &quot;height&quot; : (navItems * 50) + &quot;px&quot;});
+        }
+        var navHeight = navItems * 50;
+
+        var header = $(&apos;.ic_header&apos;).outerHeight(true);
+        var height, offset, scroll;
+        if (window.isFrameInDifferentDomain || window.isInIframe) {
+            //presenter.playerController.iframeScroll();
+            scroll = Math.max(0, window.iframeSize.offsetTop);
+            height = math.min(window.iframeSize.height, window.iframeSize.windowInnerHeight) ;
+            offset = math.ceil( (height - header - navHeight) / 2) + header;
+
+
+            document.documentElement.style.setProperty(&apos;--theme-navigation-bar-top&apos;, offset + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-popup-top&apos;, scroll + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-popup-center&apos;, (math.ceil(height / 2) + scroll) + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-popup-bottom&apos;, (math.ceil(height) + scroll) + &apos;px&apos;);
+    
+        } else {
+            var scale = presenter.playerController.getScaleInformation();
+            var page = $(&quot;.ic_page&quot;);
+            var pageHeight = page.parent().css(&quot;height&quot;).replace(&quot;px&quot;, &quot;&quot;);
+            var bodyHeight = $(window).height();
+            height = math.min(pageHeight, bodyHeight);
+            offset = math.ceil( ((height / scale.scaleY) - header - navHeight) / 2) + header;
+            scroll = window.pageYOffset;
+
+            document.documentElement.style.setProperty(&apos;--theme-navigation-bar-top&apos;, offset + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-popup-top&apos;, scroll + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-popup-center&apos;, (math.ceil(height / 2)) + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-popup-bottom&apos;, (math.ceil(height)) + &apos;px&apos;);
+            document.documentElement.style.setProperty(&apos;--theme-scale&apos;, scale.scaleY);
+        }
+
+
+        // Fix mAuthor preview ic_static_footer if present
+        if (window.isFrameInDifferentDomain || window.isInIframe) {
+            var footer = window.document.getElementsByClassName(&quot;ic_static_footer&quot;);
+            if (footer.length &gt; 0) {
+                footer[0].style.marginTop = window.iframeSize.notScaledOffset + &apos;px&apos;;
+            }
+        }
+        
+    }
+
+    function postIFrameMessage (parent, height, isFullScreen) {
+        var notScaledOffset = window.iframeSize.notScaledOffset || 0;
+        var offset, frameOffset, windowInnerHeight;
+        if (parent.isStretchOrFullScreenMode) {
+            if (isFullScreen) {
+                offset = $ (parent.document.getElementById(&apos;content-view&apos;)).scrollTop () / parent.fitToWindowScale;
+            } else {
+                offset = parent.pageYOffset / parent.fitToWindowScale || parent.document.documentElement.scrollTop / parent.fitToWindowScale;
+            }
+            frameOffset = notScaledOffset / parent.fitToWindowScale;
+            windowInnerHeight = ((parent.innerHeight - notScaledOffset) / parent.fitToWindowScale)
+        } else {
+            offset = parent.pageYOffset || parent.document.documentElement.scrollTop;
+            frameOffset = notScaledOffset;
+            windowInnerHeight = parent.innerHeight - notScaledOffset
+        }
+
+        var postObject = {
+            offsetTop: offset,
+            height: height,
+            frameOffset: frameOffset == 0 ? 0.00001 : frameOffset, //Fix icplayer incorrect top 64px in PlayerApp
+            notScaledOffset: notScaledOffset,
+            windowInnerHeight: windowInnerHeight || 0
+        };
+
+        window.postMessage (&apos;I_FRAME_SCROLL:&apos; + offset, &apos;*&apos;);
+        window.postMessage (&apos;I_FRAME_SIZES:&apos; + JSON.stringify (postObject), &apos;*&apos;);
+        
+    }
+
+    function windowEvents() {
+        var scrollableBody = window.document.getElementById(&apos;scrollableBody&apos;) || window;
+
+        scrollableBody.addEventListener(&quot;scroll&quot;, function (e) {
+            var scale = presenter.playerController.getScaleInformation();
+    
+            var scrollTop = window.pageYOffset / scale.scaleY;
+            presenter.playerController.getEventBus().sendEvent(&apos;CustomScrollEvent&apos;, {value: scrollTop});
+
+            if (!isResizing) {
+                isResizing = true;
+                setTimeout(function (e) {
+                    resize();
+                    isResizing = false;
+                }, 100);
+            }
+
+        });
+
+    }
+
+
+    function iframeEvents(parent) {
+        var $iframe = $ (parent.document.getElementById(&apos;content-iframe&apos;));
+
+
+        parent.addEventListener(&quot;resize&quot;, function () {
+            var height = parseInt ($iframe.css (&apos;height&apos;), 10);
+            postIFrameMessage (parent, height);    
+        });
+        
+        parent.addEventListener(&quot;scroll&quot;, function () {
+            var height = parseInt ($iframe.css (&apos;height&apos;), 10);
+            postIFrameMessage (parent, height);    
+        });
+
+        if (parent.document.getElementById(&apos;content-view&apos;)) {
+            parent.document.getElementById(&apos;content-view&apos;).addEventListener(&quot;scroll&quot;, function () {
+                var height = parseInt ($iframe.css (&apos;height&apos;), 10);
+                postIFrameMessage (parent, height, true);    
+            });
+        }
+
+    }
+    
+    return presenter;
+}</presenter></addon>

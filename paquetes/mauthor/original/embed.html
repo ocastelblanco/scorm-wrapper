@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta http-equiv="cache-control"
+              content="no-cache">
+        <meta name="viewport"
+              content="width=device-width, maximum-scale=1">
+        <meta name="format-detection"
+              content="telephone=no">
+        <title></title>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/jquery-1.7.1.min.js"></script>
+        <script type="text/javascript"
+                src="../../Players/mauthor/icplayer/icplayer.nocache.js"></script>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/semi-responsive-layout-chooser.js"></script>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/screen.js"></script>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/scorm.js"></script>
+
+        <script type="text/x-mathjax-config">
+        MathJax.Hub.Config({
+            TeX: {imageFont: null, extensions: ["mhchem.js", "AMSsymbols.js", "AMSmath.js"]},
+            extensions: ["tex2jax.js", "mml2jax.js", "forminput.js"],
+            skipStartupTypeset: true,
+            showProcessingMessages: false,
+            jax: ["input/TeX", "input/MathML", "output/HTML-CSS"],
+            playerObject: "player"
+          });
+    </script>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/MathJax/MathJax.js"></script>
+
+        <style>
+            body {
+                background: #FFFFFF;
+            }
+
+            #_icplayer {
+                display: table;
+            }
+        </style>
+
+        <style>
+            .no-margin {
+                margin: 0;
+                padding: 0;
+            }
+
+            .pull-left {
+                float: left;
+            }
+
+            .clear {
+                clear: both;
+            }
+        </style>
+
+        <script type="text/javascript">
+
+            function getOpener() {
+                var parent = null;
+                if (window.parent != null && window.parent.postMessage != null) {
+                    parent = window.parent;
+                }
+                if (window.opener != null && window.opener.postMessage != null) {
+                    parent = window.opener;
+                }
+                return parent;
+            }
+
+            function postResizeMessage(width, height) {
+                var parent = getOpener();
+
+                if (parent != null) {
+                    var message = "RESIZE:" + width + ";" + height;
+                    parent.postMessage(message, '*');
+                }
+            }
+
+            function postPageLoadedMessage() {
+                var parent = getOpener();
+
+                if (parent != null) {
+                    var message = "PAGE_LOADED";
+                    parent.postMessage(message, '*');
+                }
+            }
+        </script>
+
+
+
+        <script type="text/x-mathjax-config">
+	MathJax.Hub.Config({
+		TeX: {extensions: ["mhchem.js", "AMSsymbols.js", "AMSmath.js"]},
+		extensions: ["tex2jax.js", "mml2jax.js", "/media/js/forminput.js"],
+		skipStartupTypeset: true,
+		messageStyle: "none",
+		jax: ["input/TeX", "input/MathML", "output/HTML-CSS"],
+		playerObject: 'player'
+	});
+	</script>
+        <!--script type="text/javascript"
+			src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.1/MathJax.js"-->
+        </script>
+
+
+        <script type="text/javascript">
+            var player;
+            var scorm;
+            var start;
+            var scormStatus;
+            var userAgent = window.navigator.userAgent;
+            var semiResponsiveLayoutChooser;
+            var viewportmeta = document.querySelector("meta[name=viewport]");
+
+            function chooseLayout(layoutChooser, screenConfiguration) {
+                var isMobile = screenConfiguration.orientation !== window.mAuthor.ScreenUtils.ORIENTATION_TYPES.NOT_MOBILE;
+                var isVertical = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.PORTRAIT;
+                var isHorizontal = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.LANDSCAPE;
+
+                return layoutChooser.chooseLayout(screenConfiguration.width, isMobile, isVertical, isHorizontal);
+            }
+
+            function setViewPortSizesAfterScreenChanges() {
+                var $icPlayer = $('#_icplayer');
+                var width = parseInt($icPlayer.css('width'), 10);
+                var content = 'width=' + width + ',maximum-scale=1';
+                if (screen && screen.width / width < 1.0) {
+                    content += ', initial-scale=' + screen.width / width;
+                }
+                viewportmeta.setAttribute('content', content);
+            }
+
+            function icOnAppLoaded() {
+                function iframeResizeRequest() {
+                    var $icPlayer = $('#_icplayer');
+                    var width = parseInt($icPlayer.css('width'), 10);
+                    var height = parseInt($icPlayer.css('height'), 10);
+                    setViewPortSizesAfterScreenChanges();
+                    postResizeMessage(width, height);
+                }
+
+                var firstPageLoaded = false;
+                var debounceTimeoutID = null;
+                var currentScore = 0;
+
+                player = icCreatePlayer('_icplayer');
+
+                player.load('pages/main.xml', parseInt(location));
+
+                player.onPageLoaded(function onPageLoadedHandler() {
+                    start = start || new Date().getTime();
+
+                    var playerServices = player.getPlayerServices();
+                    var playerEventBus = playerServices.getEventBus();
+                    var playerCommands = playerServices.getCommands();
+
+                    if (scormStatus === 'completed') {
+                        playerCommands.checkAnswers();
+                    }
+
+                    if (!firstPageLoaded) {
+                        semiResponsiveLayoutChooser = new window.semiResponsive.LayoutChooser(player.getSemiResponsiveLayouts());
+                        var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+                        passingScore = parseInt(player.getPlayerServices().getContentMetadataValue('passingScore'), 10);
+
+                        //initialize currentScreenSize value
+                        window.mAuthor.ScreenUtils.isSoftKeyboardResize();
+
+                        var layoutID = chooseLayout(semiResponsiveLayoutChooser, screenSizes);
+                        var changed = player.changeLayout(layoutID);
+
+                        firstPageLoaded = true;
+                        window.onresize = function onResizeHandler() {
+                            if (window.mAuthor.ScreenUtils.isSoftKeyboardResize()) {
+                                return;
+                            }
+                            var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+                            var layoutID = chooseLayout(semiResponsiveLayoutChooser, screenSizes);
+                            var changed = player.changeLayout(layoutID);
+                            if (changed) {
+                                setViewPortSizesAfterScreenChanges();
+                            }
+                        };
+
+                    }
+
+                    // event bus handler
+                    var checkHandler = {
+                        onEventReceived: function () {
+                            // CHECK SIEMPRE es completed, passed (1) y terminate
+                            sendSCORMScore(true, 1, true);
+                        }
+                    };
+
+                    playerEventBus.addEventListener('ShowErrors', checkHandler);
+
+
+                    var saveHandler = {
+                        onEventReceived: function () {
+                            // SAVE SIEMPRE es incomplete, unknown (2) y terminate
+                            sendSCORMScore(false, 2, true);
+                        }
+                    };
+
+                    playerEventBus.addEventListener('SaveActivity', saveHandler);
+
+                    iframeResizeRequest();
+                    postPageLoadedMessage();
+
+                });
+
+                player.onOutstretchHeight(function () {
+                    iframeResizeRequest();
+                });
+
+                player.onPageScrollTo(function (top) {
+                    var parent = getOpener();
+
+                    if (window != parent) {
+                        parent.postMessage('SCROLLTOP:' + top, "*");
+                    } else {
+                        window.scrollTo(0, top);
+                    }
+                });
+
+                function receiveMessage(event) {
+                    var WINDOW_WIDTH_EVENT = "WINDOW_WIDTH:";
+
+                    if (!event.data) {
+                        return;
+                    }
+
+                    if (event.data.indexOf(WINDOW_WIDTH_EVENT) === 0) {
+                        if (semiResponsiveLayoutChooser) {
+                            var configuration = JSON.parse(event.data.substring(WINDOW_WIDTH_EVENT.length, event.data.length));
+                            var layoutID = chooseLayout(semiResponsiveLayoutChooser, configuration);
+                            player.changeLayout(layoutID);
+                            iframeResizeRequest();
+                        }
+                    }
+                }
+
+                window.addEventListener("message", receiveMessage, false);
+
+                scorm = getScorm();
+                var result = scorm.initializeScormCommunication(window);
+                if (result === false) {
+                    scorm = getScorm_1_2();
+                    scorm.initializeScormCommunication(window);
+                }
+                var savedState = scorm.loadState();
+                if (savedState) {
+                    player.setState(savedState);
+                }
+                var location = scorm.loadLocation();
+                if (location === false) {
+                    location = '0';
+                }
+
+                scormStatus = scorm.getCompletionStatus();
+            }
+
+            function doStart() {
+            }
+            /**
+             * Checks if all reportable pages from lesson were visited by student
+             * @param {object} presentation - presentation object returned from PlayerServices
+             * @return {boolean} True if all pages were visited, False otherwise
+             * */
+            function checkAllReportablePagesVisited(presentation) {
+                var page = null;
+                var pagesCount = presentation.getPageCount();
+
+                for (var i = 0; i < pagesCount; i++) {
+                    page = presentation.getPage(i);
+
+                    if (page.isReportable() && !page.isVisited()) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+
+            /**
+             * Saves state, score and location of SCORM package
+             */
+            function sendSCORMScore(completeScorm, successScorm, terminateScorm) {
+                var end = new Date().getTime();
+                var allPagesVisited = false;
+
+                // This ensures that Player knows to update score before leaving page, event for score type FIRST.
+                if (player.hasOwnProperty('forceScoreUpdate')) {
+                    player.forceScoreUpdate();
+                }
+
+                var ps = player.getPlayerServices();
+                var utils = new PlayerUtils(player);
+                var presentation = utils.getPresentation();
+
+                var score = utils.getPresentationScore(presentation);
+                for (var i = 0; i < score.paginatedResult.length; i++) {
+                    var s = score.paginatedResult[i];
+                    scorm.setPageName(i, 'Page_' + s.page_number);
+                    scorm.setPageMinScore(i, 0);
+                    scorm.setPageMaxScore(i, 1);
+                    scorm.setPageRawScore(i, s.score);
+                    scorm.setPageScaledScore(i, s.score);
+                }
+
+                var _rawscore = score.scaledScore * 100;
+                var rawscore = Math.round(_rawscore);
+
+                if (presentation) {
+                    allPagesVisited = checkAllReportablePagesVisited(presentation);
+                }
+
+                scorm.setMinScore(0);
+                scorm.setMaxScore(100);
+                scorm.setRawScore(rawscore);
+                scorm.setScaledScore(_rawscore / 100);
+                scorm.setSessionTime(end - start);
+                scorm.saveState(player.getState());
+                scorm.saveLocation(ps.getCurrentPageIndex());
+
+                if (completeScorm) {
+                    scorm.setCompleted();
+                    scormStatus = "completed";
+                } else {
+                    scorm.setIncomplete();
+                    scormStatus = "incomplete";
+                }
+
+                if (successScorm == 1) {
+                    scorm.setPassed();
+                } else if (successScorm == 0) {
+                    scorm.setFailed();
+                } else if (successScorm == 2) {
+                    scorm.setUnknown();
+                }
+
+                scorm.commitScormCommunication();
+                if (terminateScorm) {
+                    scorm.terminateScormCommunication();
+                }
+            }
+
+        </script>
+
+    </head>
+
+    <body class="no-margin"
+          onload="doStart();">
+        <div id="_icplayer"
+             class="no-margin pull-left"></div>
+        <div class="clear"></div>
+    </body>
+
+</html>

@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <meta http-equiv="cache-control"
+              content="no-cache">
+        <meta name="viewport"
+              content="width=device-width, initial-scale=1">
+        <meta name="format-detection"
+              content="telephone=no">
+        <title></title>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/jquery-1.7.1.min.js"></script>
+		<script type="text/javascript"
+                src="../../Players/mauthor/icplayer/icplayer.nocache.js"></script>
+		<script type="text/javascript"
+                src="../../Players/mauthor/javascript/semi-responsive-layout-chooser.js"></script>
+        <script type="text/javascript"
+                src="../../Players/mauthor/javascript/screen.js"></script>
+        <style>
+            html {
+                margin: 0;
+                -webkit-overflow-scrolling: touch !important;
+                height: 100% !important;
+            }
+
+            body {
+                margin: 0;
+                -webkit-overflow-scrolling: touch !important;
+            }
+
+            #content {
+                overflow: hidden;
+            }
+
+            #content-iframe {
+                border: none;
+            }
+        </style>
+
+    </head>
+
+    <body>
+        <div id="content-view">
+            <div id="content">
+                <iframe id="content-iframe"
+                        allowfullscreen="allowfullscreen"></iframe>
+            </div>
+        </div>
+
+        <script>
+
+            $(function () {
+                var $body = $('body'),
+                    $frame = $('iframe#content-iframe'),
+                    embedWindow = $frame[0].contentWindow || $frame[0].contentDocument,
+                    $contentView = $('#content-view'),
+                    $content = $('#content'),
+                    isFitToWindow = true,
+                    frameInitialSize;
+
+                window.isStretchOrFullScreenMode = isFitToWindow;
+
+                function _resizeContentToWindow(retry) {
+                    var frameWidth = $frame.outerWidth(), frameHeight = $frame.outerHeight(),
+                        windowWidth = window.innerWidth,
+                        windowHeight = window.innerHeight,
+                        bodyWidth = $body.innerWidth(),
+                        bodyHeight = $body.innerHeight(),
+                        zoom = bodyWidth / frameWidth,
+                        scale;
+
+                    window.fitToWindowScale = zoom;
+
+                    if (!frameInitialSize) {
+                        frameInitialSize = {
+                            'width': frameWidth,
+                            'height': frameHeight
+                        };
+                    }
+
+                    scale = 'scale(' + zoom + ')';
+
+                    $frame.css({
+                        'position': 'relative',
+                        'left': 0,
+                        'top': 0,
+                        '-moz-transform': scale,
+                        '-webkit-transform': scale,
+                        '-o-transform': scale,
+                        '-ms-transform': scale,
+                        'transform': scale,
+                        "transform-origin": "left top",
+                        "-webkit-transform-origin": "left top"
+                    });
+
+                    $contentView.css({
+                        'width': frameWidth * zoom + 'px',
+                        'max-width': frameWidth * zoom + 'px'
+                    });
+
+                    $content.css({
+                        'width': frameWidth * zoom + 'px',
+                        'height': frameHeight * zoom + 'px'
+                    });
+
+                    //if content is lower than window then resizing lesson to window width will cause scrollbar appearance,
+                    //scrollbar causes window width shrinking -- we need to resize content again to smaller window width.
+                    if (!retry && bodyWidth == windowWidth && windowHeight >= bodyHeight) {
+                        _resizeContentToWindow(true);
+                    }
+                }
+
+                function _clearAfterResizeToWindow() {
+                    $frame.css({
+                        'width': frameInitialSize.width + 'px',
+                        'height': frameInitialSize.height + 'px',
+                        'position': '',
+                        'left': '',
+                        'top': '',
+                        '-moz-transform': '',
+                        '-webkit-transform': '',
+                        '-o-transform': '',
+                        '-ms-transform': '',
+                        'transform': ''
+                    });
+
+                    $content.css({
+                        'width': '',
+                        'height': ''
+                    });
+
+                    $contentView.css({
+                        'width': '',
+                        'max-width': ''
+                    });
+                }
+
+                function onWindowResize() {
+                    if (isFitToWindow) {
+                        _resizeContentToWindow();
+                    }
+                }
+
+                function onMessageReceived(event) {
+                    var data = event.data, size, width, height;
+                    if (data.indexOf('RESIZE:') === 0) {
+                        size = data.substring('RESIZE:'.length).split(';');
+                        width = parseInt(size[0]);
+                        height = parseInt(size[1]);
+
+                        frameInitialSize = {
+                            'width': width,
+                            'height': height
+                        };
+
+                        $frame.css({
+                            'width': width + 'px',
+                            'height': height + 'px'
+                        });
+
+                        if (isFitToWindow) {
+                            _resizeContentToWindow();
+                        }
+                    }
+                }
+
+                window.addEventListener('message', onMessageReceived, false);
+                $(window).resize(onWindowResize);
+                onWindowResize();
+
+            });
+
+            $(function () {
+                var $iframe = $('#content-iframe'),
+                    viewPort = document.querySelector("meta[name=viewport]"),
+                    iframeWindow = $iframe[0].contentWindow || $iframe[0].contentDocument;
+
+                var userAgent = window.navigator.userAgent;
+                var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+
+                function getHash() {
+                    return window.location.hash.substring(1);
+                }
+
+                function onMessageReceived(event) {
+                    if (event.data.indexOf('RESIZE:') === 0 && !window.isStretchOrFullScreenMode) {
+                        handleResize(event.data.substring('RESIZE:'.length));
+                        var height = parseInt($iframe.css('height'), 10);
+                        postIFrameMessage(height, true);
+                    } else if (event.data.indexOf('SCROLLTOP:') === 0) {
+                        handleScrollTop(event.data.substring('SCROLLTOP:'.length));
+                    } else if (event.data.indexOf('PAGE_LOADED') === 0) {
+                        document.body.scrollTop = 0;
+                        var height = parseInt($iframe.css('height'), 10);
+                        postIFrameMessage(height, true);
+                    }
+                }
+
+                function handleResize(data) {
+                    var dimensions = data.split(';');
+                    var width = dimensions[0];
+                    var height = dimensions[1];
+
+                    $iframe.css({
+                        'width': width + 'px',
+                        'height': height + 'px'
+                    });
+
+
+                    viewPort.setAttribute('content', 'width=' + width);
+                }
+
+                function handleScrollTop(data) {
+                    var top = parseInt(data),
+                        frameTop = $iframe.offset().top,
+                        position = top + frameTop;
+
+                    window.scrollTo(0, position);
+                }
+
+                function postIFrameMessage(height, isFullScreen) {
+                    var offset, frameOffset, windowInnerHeight;
+                    if (isFullScreen) {
+                        offset = $("#content-view").scrollTop() / window.fitToWindowScale;
+                    } else {
+                        offset = window.pageYOffset / window.fitToWindowScale || document.documentElement.scrollTop / window.fitToWindowScale;
+                    }
+                    frameOffset = 0.0001;
+                    windowInnerHeight = window.innerHeight / window.fitToWindowScale + (0 / window.fitToWindowScale)
+                    var postObject = {
+                        offsetTop: offset,
+                        height: height,
+                        frameOffset: frameOffset,
+                        notScaledOffset: 0,
+                        windowInnerHeight: windowInnerHeight || 0
+                    };
+
+                    iframeWindow.postMessage('I_FRAME_SCROLL:' + offset, '*');
+                    iframeWindow.postMessage('I_FRAME_SIZES:' + JSON.stringify(postObject), '*');
+                }
+
+                function postWindowWidth() {
+                    var type = "WINDOW_WIDTH:";
+                    var screenSizes = window.mAuthor.ScreenUtils.getScreenSizesDependingOnOrientation(userAgent);
+
+                    var message = type + JSON.stringify(screenSizes);
+
+                    iframeWindow.postMessage(message, '*');
+                }
+
+                $iframe.width(screenSizes.width);
+                $iframe.height(screenSizes.height);
+                $iframe.attr('src', 'embed.html#' + getHash());
+
+                window.addEventListener("resize", function () {
+                    postWindowWidth();
+                });
+
+                window.addEventListener("orientationchange", function () {
+                    postWindowWidth();
+                }, false);
+
+                window.addEventListener('scroll', function (event) {
+                    var height = parseInt($iframe.css('height'), 10);
+                    postIFrameMessage(height);
+                });
+
+                window.addEventListener('message', onMessageReceived, false);
+
+                $("#content-view").on('scroll', function () {
+                    var height = parseInt($iframe.css('height'), 10);
+                    postIFrameMessage(height, true);
+                });
+
+                var height = parseInt($iframe.css('height'), 10);
+                postIFrameMessage(height, true);
+            });
+        </script>
+    </body>
