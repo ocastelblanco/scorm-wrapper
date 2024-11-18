@@ -22,6 +22,7 @@
 		<property name="Ignore punctuation" nameLabel="Table_property_ignore_punctuation" type="boolean"/>
 		<property name="Gap width" nameLabel="Table_property_gap_width" type="string"/>
         <property name="Gap Type" nameLabel="Table_property_gap_type" type="{editable, draggable, math}"/>
+		<property displayName="Gap max length" name="GapMaxLength" nameLabel="Table_property_gap_max_length" type="string" value="0"/>
 		<property name="newWidthCalculate" nameLabel="Table_property_new_width_calculate" type="boolean"/>
 		<property displayName="Lang attribute" name="langAttribute" nameLabel="Table_property_lang_attribute" type="string"/>
 		<property displayName="Speech texts" name="speechTexts" nameLabel="Hierarchical_Lesson_Report_property_speech_texts" type="staticlist">
@@ -294,7 +295,9 @@
         }
 
         presenter.gapsContainer.replaceDOMViewWithGap();
+        presenter.gapsContainer.updateGapMaxLength();
         presenter.setGapsClassAndWidth();
+        presenter.gapsContainer.addMaxLengthParamToGaps();
     };
 
     /**
@@ -314,6 +317,7 @@
         delete presenter.setState;
         delete presenter.getGapTextCommand;
         delete presenter.getGapTextCommand;
+        delete presenter.setGapTextCommand;
         delete presenter.markGapAsEmptyCommand;
         delete presenter.markGapAsCorrectCommand;
         delete presenter.markGapAsWrongCommand;
@@ -432,7 +436,7 @@
         presenter.lastDraggedItem = {};
 
         if (presenter.configuration.isDisabledByDefault) {
-            presenter.gapsContainer.lockAllGaps();
+            presenter.disableAllGaps();
         }
 
         presenter.buildKeyboardController();
@@ -862,6 +866,8 @@
 
         var isTabindexEnabled = ModelValidationUtils.validateBoolean(model['Is Tabindex Enabled']);
 
+        const gapMaxLength = ModelValidationUtils.validatePositiveInteger(model["GapMaxLength"]);
+
         return {
             addonID: model.ID,
             isValid: true,
@@ -878,6 +884,7 @@
             newWidthCalculate: ModelValidationUtils.validateBoolean(model["newWidthCalculate"]),
             gapWidth: gapWidth,
             gapType: model["Gap Type"],
+            gapMaxLength: gapMaxLength,
             isTabindexEnabled: isTabindexEnabled,
             columnsCount: validatedColumns.value,
             rowsCount: validatedRows.value,
@@ -1005,6 +1012,17 @@
         return upgradedModel;
     };
 
+    presenter.addGapMaxLength = function (model) {
+        const upgradedModel = {};
+        jQuery.extend(true, upgradedModel, model);
+
+        if (!upgradedModel.hasOwnProperty('GapMaxLength')) {
+            upgradedModel['GapMaxLength'] = '0';
+        }
+
+        return upgradedModel;
+    }
+
     presenter.upgradeModel = function (model) {
         var upgradedModel = presenter.addColumnsWidth(model);
         upgradedModel = presenter.addRowHeights(upgradedModel);
@@ -1014,6 +1032,7 @@
         upgradedModel = presenter.addKeepOriginalOrder(upgradedModel);
         upgradedModel = presenter.addHeaders(upgradedModel);
         upgradedModel = presenter.addSpanSpeechTexts(upgradedModel);
+        upgradedModel = presenter.addGapMaxLength(upgradedModel);
         return upgradedModel;
     };
 
@@ -1043,6 +1062,21 @@
 
     presenter.getGapTextCommand = function (params) {
         return presenter.getGapText(parseInt(params[0], 10));
+    };
+
+    presenter.setGapText = function (gapIndex, text) {
+        if (["draggable", "math"].includes(presenter.configuration.gapType)) {
+            return;
+        }
+
+        const validatedGapIndex = presenter.validateGapIndex(gapIndex);
+        if (validatedGapIndex.isValid) {
+            presenter.gapsContainer.setGapTextByIndex(validatedGapIndex.index, text);
+        }
+    };
+
+    presenter.setGapTextCommand = function (params) {
+        presenter.setGapText(parseInt(params[0], 10), params[1]);
     };
 
     function executeFunctionOnGap(gapIndex, functionToCall) {
@@ -1090,7 +1124,7 @@
     };
 
     presenter.enableGap = function (gapIndex) {
-        executeFunctionOnGap(gapIndex, "unlockGapByIndex");
+        executeFunctionOnGap(gapIndex, "enableGapByIndex");
     };
 
     presenter.enableGapCommand = function (params) {
@@ -1098,11 +1132,11 @@
     };
 
     presenter.enableAllGaps = function () {
-        presenter.gapsContainer.unlockAllGaps();
+        presenter.gapsContainer.enableAllGaps();
     };
 
     presenter.disableGap = function (gapIndex) {
-        executeFunctionOnGap(gapIndex, "lockGapByIndex");
+        executeFunctionOnGap(gapIndex, "disableGapByIndex");
     };
 
     presenter.disableGapCommand = function (params) {
@@ -1110,7 +1144,7 @@
     };
 
     presenter.disableAllGaps = function () {
-        presenter.gapsContainer.lockAllGaps();
+        presenter.gapsContainer.disableAllGaps();
     };
 
     presenter.getView = function() {
@@ -1130,6 +1164,7 @@
             'enableGap': presenter.enableGapCommand,
             'getGapText': presenter.getGapTextCommand,
             'getGapValue': presenter.getGapTextCommand,
+            'setGapText': presenter.setGapTextCommand,
             'getView': presenter.getView,
             'hide': presenter.hide,
             'isAllOK': presenter.isAllOK,
@@ -1197,8 +1232,12 @@
         }
 
         if (isConnectedWithMath) {
-            presenter.gapsContainer.unlockAllGaps();
-            presenter.gapsContainer.lockAllNotEmptyGaps();
+            if (presenter.isShowAnswersActive) {
+                presenter.gapsContainer.gaps.forEach(function(gap) {
+                    gap.onHideAnswers();
+                })
+            }
+            presenter.gapsContainer.lockAllGaps();
         }
     };
 
@@ -1271,10 +1310,14 @@
         } else {
             if (presenter.isSetShowErrorsMode) {
                 presenter.setWorkMode();
-                
+
                 if (isConnectedWithMath) {
-                    presenter.disableAllGaps();
+                    presenter.gapsContainer.lockAllGaps();
                 }
+            }
+            if (isConnectedWithMath) {
+                presenter.isShowAnswersActive = true;
+                presenter.isSetShowErrorsMode = false;
             }
         }
     };
@@ -1348,6 +1391,9 @@
     presenter.GapUtils.prototype.parseValue = function (value) {
         if(presenter.hasMathGaps()) {
             return value;
+        }
+        if (presenter.textParser) {
+            value = presenter.textParser.parseAnswer(value);
         }
 
         if (!presenter.configuration.isCaseSensitive) {
@@ -1508,16 +1554,26 @@
         };
     };
 
-    presenter.GapUtils.prototype.setIsEnabled = function (isEnabled) {
-        if (this.isDisabled &amp;&amp; isEnabled) {
+    presenter.GapUtils.prototype.setIsEnabled = function (value) {
+        if (this.isDisabled &amp;&amp; value) {
             this.unlock();
         }
 
-        if (!this.isDisabled &amp;&amp; !isEnabled) {
+        if (!this.isDisabled &amp;&amp; !value) {
             this.lock();
         }
 
-        this.isEnabled = isEnabled;
+        this.isEnabled = value;
+    };
+
+    presenter.GapUtils.prototype.setIsLocked = function (value) {
+        if (this.isEnabled &amp;&amp; this.isDisabled &amp;&amp; !value) {
+            this.unlock();
+        }
+
+        if (!this.isDisabled &amp;&amp; value) {
+            this.lock();
+        }
     };
 
     presenter.GapUtils.prototype.setMathShowAnswersValue = function (value) {
@@ -1545,7 +1601,7 @@
         var value = configuration.value;
         var source = configuration.source;
         var isEnabled = configuration.isEnabled;
-        var droppedElement = configuration.droppable;
+        var droppedElement = configuration.droppedElement;
         this.isAttempted = configuration.isAttempted === undefined ? false : configuration.isAttempted;
 
         if (presenter.configuration.gapType === "draggable") {
@@ -1592,7 +1648,8 @@
             connectEvents: presenter.SelectGap.prototype.connectEvents,
             setViewValue: presenter.SelectGap.prototype.setViewValue,
 
-            gapScore: gapScore
+            gapScore: gapScore,
+            maxLength: presenter.getMaxLength(correctAnswer)
         };
 
         presenter.GapUtils.call(this, configuration);
@@ -1658,7 +1715,8 @@
             connectEvents: this.connectEvents,
             setViewValue: presenter.EditableInputGap.prototype.setViewValue,
 
-            gapScore: gapScore
+            gapScore: gapScore,
+            maxLength: presenter.getMaxLength(correctAnswer)
         };
 
         presenter.GapUtils.call(this, configuration);
@@ -1677,25 +1735,26 @@
     };
 
     presenter.EditableInputGap.prototype.createView = function () {
+        var $gapView;
         if (presenter.hasMathGaps()) {
-            return $(presenter.$view).find("input[id='"+this.objectID+"']");
-        }else{
+            $gapView = $(presenter.$view).find("input[id='"+this.objectID+"']");
+        } else {
             var inputType = "text";
             if (presenter.configuration.useNumericKeyboard) {
                 inputType = "tel";
             }
-            var $inputGap = $('&lt;input type="' + inputType + '" value="" id="' + this.objectID + '" /&gt;');
-            $inputGap.css({
+            $gapView = $('&lt;input type="' + inputType + '" value="" id="' + this.objectID + '" /&gt;');
+            $gapView.css({
                 width: presenter.configuration.gapWidth + "px"
             });
 
-            $inputGap.addClass("ic_gap");
+            $gapView.addClass("ic_gap");
             if (presenter.configuration.useNumericKeyboard) {
-                $inputGap.attr("step", "any");
+                $gapView.attr("step", "any");
             }
-
-            return $inputGap;
         }
+        $gapView.attr("autocomplete", "off");
+        return $gapView;
     };
 
     presenter.EditableInputGap.prototype.onKeyUp = function(event) {
@@ -1778,7 +1837,8 @@
             fillGap: presenter.DraggableDroppableGap.prototype.fillGap,
             makeGapEmpty: presenter.DraggableDroppableGap.prototype.makeGapEmpty,
 
-            gapScore: gapScore
+            gapScore: gapScore,
+            maxLength: presenter.getMaxLength(correctAnswers)
         };
 
         presenter.GapUtils.call(this, configuration);
@@ -1828,6 +1888,18 @@
         this.notify();
     };
 
+    presenter.getMaxLength = function (correctAnswers) {
+        let maxLength = presenter.configuration.gapMaxLength.value;
+
+        correctAnswers.forEach(answers =&gt; {
+            if (answers.length &gt; maxLength) {
+                maxLength = answers.length;
+            }
+        });
+
+        return maxLength;
+    };
+
     presenter.GapsContainerObject = function () {
         this.gaps = [];
     };
@@ -1850,6 +1922,29 @@
                 element.attr("placeholder", placeholder);
                 element.removeClass("ic_gap").addClass("ic_filled_gap");
             }
+        });
+    };
+
+    presenter.GapsContainerObject.prototype.updateGapMaxLength = function () {
+        this.gaps.filter(function (gap) {
+            return gap.gapType === presenter.GapUtils.GAP_TYPE.NORMAL;
+        }).forEach(gap =&gt; {
+            const gapMaxLength = gap.getGapMaxLength();
+            const element = presenter.$view.find(`#${gap.getObjectID()}`);
+            const placeholder = element.attr('placeholder');
+            const placeholderLength = placeholder ? placeholder.length : 0;
+
+            gap.setGapMaxLength(Math.max(gapMaxLength, placeholderLength));
+        });
+    };
+
+    presenter.GapsContainerObject.prototype.addMaxLengthParamToGaps = function () {
+        this.gaps.filter(gap =&gt; {
+            return gap.gapType === presenter.GapUtils.GAP_TYPE.NORMAL;
+        }).forEach(gap =&gt; {
+            const gapMaxLength = gap.getGapMaxLength();
+            const element = presenter.$view.find(`#${gap.getObjectID()}`);
+            $(element).attr('maxlength', gapMaxLength);
         });
     };
 
@@ -1951,17 +2046,22 @@
         return this.gaps[index].getValue();
     };
 
-    presenter.GapsContainerObject.prototype.setLockGapByIndex = function (index, lock) {
-        this.gaps[index].setIsEnabled(lock);
+    presenter.GapsContainerObject.prototype.setGapTextByIndex = function (index, text) {
+        this.gaps[index].setValue(text);
+        this.gaps[index].setViewValue(text);
         this.gaps[index].notifyEdit();
     };
 
+    presenter.GapsContainerObject.prototype.setLockGapByIndex = function (index, value) {
+        this.gaps[index].setIsLocked(value);
+    };
+
     presenter.GapsContainerObject.prototype.lockGapByIndex = function (index) {
-        this.setLockGapByIndex(index, false);
+        this.setLockGapByIndex(index, true);
     };
 
     presenter.GapsContainerObject.prototype.unlockGapByIndex = function (index) {
-        this.setLockGapByIndex(index, true);
+        this.setLockGapByIndex(index, false);
     };
 
     presenter.GapsContainerObject.prototype.unlockAllGaps = function () {
@@ -1976,11 +2076,28 @@
         }, this);
     };
 
-    presenter.GapsContainerObject.prototype.lockAllNotEmptyGaps = function () {
+    presenter.GapsContainerObject.prototype.setEnableGapByIndex = function (index, isEnabled) {
+        this.gaps[index].setIsEnabled(isEnabled);
+        this.gaps[index].notifyEdit();
+    };
+
+    presenter.GapsContainerObject.prototype.disableGapByIndex = function (index) {
+        this.setEnableGapByIndex(index, false);
+    };
+
+    presenter.GapsContainerObject.prototype.enableGapByIndex = function (index) {
+        this.setEnableGapByIndex(index, true);
+    };
+
+    presenter.GapsContainerObject.prototype.enableAllGaps = function () {
         this.gaps.map(function (gap, index) {
-            if(!gap.isValueEmpty()){
-                this.lockGapByIndex(index);
-            }
+            this.enableGapByIndex(index);
+        }, this);
+    };
+
+    presenter.GapsContainerObject.prototype.disableAllGaps = function () {
+        this.gaps.map(function (gap, index) {
+            this.disableGapByIndex(index);
         }, this);
     };
 
@@ -2134,13 +2251,21 @@
         MathJax.CallBack.Queue().Push(function () {
             MathJax.Hub.Typeset(presenter.$view.find(".table-addon-wrapper")[0]);
         });
+
+        addDisplayStyleToMathJaxElements();
     };
 
     presenter.rerenderMathJax = function () {
         MathJax.CallBack.Queue().Push(function () {
             MathJax.Hub.Rerender(presenter.$view.find(".table-addon-wrapper")[0]);
         });
+
+        addDisplayStyleToMathJaxElements();
     };
+
+    function addDisplayStyleToMathJaxElements() {
+        $('annotation-xml').css({display: 'flex'});
+    }
 
     function TableKeyboardController (elements, columnsCount, rowsCount) {
         var newElements = accountForMergedCells(elements, columnsCount, rowsCount);

@@ -129,9 +129,14 @@
 
     presenter.presenterLogic = function (view, model, isPreview) {
         presenter.$view = $(view);
-        view.addEventListener('DOMNodeRemoved', presenter.destroy);
         var upgradedModel = presenter.upgradeModel(model);
         presenter.configuration = presenter.validateModel(upgradedModel);
+
+        if (!isPreview) {
+            MutationObserverService.createDestroyObserver(presenter.configuration.ID, presenter.destroy, presenter.$view.get(0));
+            MutationObserverService.setObserver();
+        }
+
         if (!presenter.configuration.isValid) {
             DOMOperationsUtils.showErrorMessage(view, presenter.ERROR_CODES, presenter.configuration.errorCode);
             return false;
@@ -175,22 +180,32 @@
         }
 
         return {title: '', description: ''};
-    }
+    };
 
     function getResponsiveVoiceLanguage (langTag) {
+        /* Function at first take language from Responsive Voice text area, next is seeking in Responsive Voice
+        * library script and finally return default language */
+        const languages = presenter.playerController.getResponsiveVoiceLang();
+        const langDict = JSON.parse(languages ? languages : "{}");
+
         if (!langTag) {
-            // get lang from document &lt;html lang=""&gt;
             langTag = document.documentElement.lang;
         }
 
-        // Tags for Identifying Languages: https://www.ietf.org/rfc/bcp/bcp47.txt
-        var languages = {
-            'en': 'UK English Male',
-            'pl': 'Polish Female',
-            'de': 'Deutsch Female'
-        };
+        if (langDict &amp;&amp; langDict[langTag]) {
+            return langDict[langTag];
+        } else if (isLanguageInLibrary(langTag)) {
+            return getLanguageFromLibrary(langTag);
+        }
+        return 'UK English Male';
+    }
 
-        return languages[langTag] || 'UK English Male';
+    function getLanguageFromLibrary (langTag) {
+        return window.responsiveVoice.responsivevoices.find(responsiveVoice =&gt; responsiveVoice.lang.includes(langTag)).name;
+    }
+
+    function isLanguageInLibrary (langTag) {
+        return window.responsiveVoice.responsivevoices.some(responsiveVoice =&gt; responsiveVoice.lang.includes(langTag));
     }
 
     function getSpeechSynthesisLanguage (langTag) {
@@ -248,6 +263,7 @@
     }
 
     presenter.intervalId = null;
+    presenter.intervalResume = null;
 
     // https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis
     function speechSynthesisSpeak (texts, finalCallback) {
@@ -259,6 +275,19 @@
         }
         var onStartExecuted = false;
         // Fix for running speak method after cancelling SpeechSynthesis queue
+        if(presenter.intervalResume != null) {
+            clearInterval(presenter.intervalResume);
+            presenter.intervalResume = undefined;
+        }
+
+        // Necessary for Chrome browser because instead stop reading
+        if (isChrome()) {
+                presenter.intervalResume = setInterval(function () {
+                window.speechSynthesis.pause();
+                window.speechSynthesis.resume();
+            }, 3000);
+        }
+
         presenter.intervalId = setInterval(function() {
 
             if (window.speechSynthesis.speaking) {
@@ -269,6 +298,9 @@
             if (textsObjects.length === 0) {
                 clearInterval(presenter.intervalId);
                 presenter.intervalId = undefined;
+
+                clearInterval(presenter.intervalResume);
+                presenter.intervalResume = undefined;
                 return;
             }
             if (presenter.intervalId == null) return;
@@ -497,6 +529,40 @@
         return splitText;
     }
 
+    presenter.removeUnnecessaryPunctuationMarks = function (texts) {
+        texts.forEach(text =&gt; {
+            const splittedWords = text.text
+                .replaceAll(" \/", ",")
+                .split(" ");
+
+            const newSentence = [];
+            splittedWords.forEach(word =&gt; {
+                if (word.trim().length) {
+                    const matchAfterLetter = word.match(/(\w\W)[.,?!]+/); // regex captures at least 2 special characters after word
+                    const matchAloneOrSeparated = word.match(/(^|\s)[.,?!(){}\\\/\-\[\]]+/); // regex captures at least 1 special separated character or character at the beginning of sentence
+                    if (matchAfterLetter) {
+                        newSentence.push(word.replace(matchAfterLetter[0], matchAfterLetter[1]));
+                    } else if (matchAloneOrSeparated &amp;&amp; !presenter.isMatchContainSentence(matchAloneOrSeparated)) {
+                        return;
+                    } else {
+                        newSentence.push(word);
+                    }
+                }
+            });
+            text.text = newSentence.join(" ");
+        });
+
+        return texts.filter(text =&gt; text.text.length);
+    };
+
+    presenter.isMatchContainSentence = function (word) {
+        if (!word) {
+            return;
+        }
+
+        return word['input'].match(/[a-zA-Z0-9]+/);
+    }
+
     // Too long utterences may take much too long to load or exceed Speech Synthesis API character limit
     presenter.splitLongTexts = function (texts) {
         let finalSplitTexts = [];
@@ -604,6 +670,8 @@
 
     presenter.readText = function(texts, callback) {
         texts = presenter.splitLongTexts(texts);
+        texts = presenter.removeUnnecessaryPunctuationMarks(texts);
+
         if (window.responsiveVoice) {
             responsiveVoiceSpeak(texts, callback);
             return;
@@ -848,11 +916,13 @@
         if(presenter.speechSynthInterval!==null){
             clearInterval(presenter.intervalId);
             presenter.intervalId = undefined;
+
+            clearInterval(presenter.intervalResume);
+            presenter.intervalResume = undefined;
         }
     };
 
     presenter.destroy = function () {
-        presenter.$view[0].removeEventListener('DOMNodeRemoved', presenter.destroy);
         presenter.cancelSpeechSynthesis();
         presenter.configuration = null;
         presenter.$view = null;

@@ -12,6 +12,7 @@
 			<property isLocalized="false" name="y to x" nameLabel="Plot_property_y_to_x" type="boolean"/>
 			<property isLocalized="false" name="hidden" nameLabel="Plot_property_hidden" type="boolean"/>
 			<property isLocalized="false" name="color" nameLabel="Plot_property_color" type="string"/>
+			<property isLocalized="false" name="mark at length" nameLabel="Plot_property_mark_at_length" type="string"/>
 		</property>
 		<property name="Variables" nameLabel="Plot_property_variables" type="list">
 			<property isLocalized="false" name="plot id" nameLabel="Plot_property_plot_id" type="string"/>
@@ -50,8 +51,11 @@
 		<property isLocalized="false" name="Asymptote DY" nameLabel="Plot_property_asymptote_dy" type="int"/>
 		<property isLocalized="false" name="Broadcast" nameLabel="Plot_property_broadcast" type="string"/>
 		<property isLocalized="false" name="Decimal separator" nameLabel="Plot_property_decimal_separator" type="string"/>
-        <property isLocalized="false" name="X axis values position" nameLabel="Plot_property_x_axis_values_position" type="int"/>
-        <property isLocalized="false" name="Y axis values position" nameLabel="Plot_property_y_axis_values_position" type="int"/>
+		<property isLocalized="false" name="X axis values position" nameLabel="Plot_property_x_axis_values_position" type="int"/>
+		<property isLocalized="false" name="X axis values position" nameLabel="Plot_property_x_axis_values_position" type="int"/>
+		<property isLocalized="false" name="Check marks" nameLabel="Plot_property_check_marks" type="{No, One mark, Individual marks}"/>
+		<property isLocalized="false" name="Correct marks HTML" nameLabel="Plot_property_correct_marks_html" type="string"/>
+		<property isLocalized="false" name="Error marks HTML" nameLabel="Plot_property_error_marks_html" type="string"/>
 	</model>
 <css>.canvas {
 	background-color:#ffffff;
@@ -209,6 +213,48 @@
     fill-opacity:1;
     fill:#00bb00;
 }
+
+.canvas .mark.addon_mark.mark_error{
+	color: #ff0000;
+}
+
+.canvas .mark.addon_mark.mark_correct{
+	color: #00bb00;
+}
+
+.canvas .mark.addon_mark {
+	position: absolute;
+	left: 90%;
+	top: 10%;
+}
+
+.canvas .mark.point_mark {
+	transform: scale(1, -1) translate(8px, 0px);
+	dominant-baseline: text-after-edge;
+}
+
+.canvas .mark.expression_mark {
+	transform: scale(1, -1);
+	dominant-baseline: hanging;
+}
+
+.canvas .mark.point_mark.mark_correct,
+.canvas .mark.expression_mark.mark_correct {
+	fill:#00bb00;
+	stroke:#00bb00;
+	stroke-width:2;
+}
+
+.canvas .mark.point_mark.mark_error,
+.canvas .mark.expression_mark.mark_error {
+	fill:#ff0000;
+	stroke:#bb0000;
+	stroke-width:2;
+}
+
+.canvas .mark {
+	font-size: 16px;
+}
 </css><view>&lt;div class="canvas" style="width:100%; height:100%; overflow:hidden"&gt;
 &lt;/div&gt;
 </view><preview>&lt;div class="canvas" style="width:100%; height:100%; overflow:hidden"&gt;
@@ -277,6 +323,12 @@
         this.attempted = false;
         this.xAxisValuesPosition = 0;
         this.yAxisValuesPosition = 0;
+
+        this.CHECKMARKS = {
+            NO: "No",
+            ONE_MARK: "One mark",
+            INDIVIDUAL_MARKS: "Individual marks"
+        };
 
         this.setXAxisValuesPosition = function (value) {
             this.svgDoc.find('.axisThicksTextX').attr('y', value);
@@ -753,6 +805,89 @@
                     }
                 });
             }
+        }
+        this.areIndividualMarks = function () {
+            return this.checkMarks === this.CHECKMARKS.INDIVIDUAL_MARKS;
+        }
+        this.isOneMark = function () {
+            return this.checkMarks === this.CHECKMARKS.ONE_MARK;
+        }
+        this.createIndividualMarksSVGDOMGroup = function () {
+            const $groupsParent = this.svgDoc.find(".overall");
+            this.svg.group($groupsParent, {
+                class_: "marks"
+            });
+        }
+        this.drawOneCorrectMark = function () {
+            this.drawOneMark(true);
+        }
+        this.drawOneErrorMark = function () {
+            this.drawOneMark(false);
+        }
+        this.drawOneMark = function (isCorrect) {
+            const additionalClassName = isCorrect ? "mark_correct" :  "mark_error";
+            const innerHTML = isCorrect ? this.correctMarksHTML : this.errorMarksHTML;
+
+            const addonMark = document.createElement("div");
+            addonMark.classList.add("mark");
+            addonMark.classList.add("addon_mark");
+            addonMark.classList.add(additionalClassName);
+            $(addonMark).html(window.xssUtils.sanitize(innerHTML));
+            this.svgDoc.parent().append(addonMark);
+        }
+        this.drawCorrectMarkForPoint = function (x, y) {
+            this.drawMarkForPoint(x, y, true);
+        }
+        this.drawErrorMarkForPoint = function (x, y) {
+            this.drawMarkForPoint(x, y, false);
+        }
+        this.drawMarkForPoint = function (x, y, isCorrect) {
+            this.svgDoc.find('.marks .mark.point_mark[vx="' + x + '"][vy="' + y + '"]').remove();
+
+            const additionalClassName = isCorrect ? "mark_correct" :  "mark_error";
+            const innerHTML = isCorrect ? this.correctMarksHTML : this.errorMarksHTML;
+            const $source = this.svgDoc.find('.point[vx="' + x + '"][vy="' + y + '"]');
+
+            this.svg.text(this.svgDoc.find(".marks"), "",  {
+                "x": $source.attr("cx"),
+                "y": -$source.attr("cy"),
+                "vx": x,
+                "vy": y,
+                "class": "mark point_mark " + additionalClassName,
+            });
+
+            const $text = this.svgDoc.find('.marks .mark.point_mark[vx="' + x + '"][vy="' + y + '"]');
+            $text.html(window.xssUtils.sanitize(innerHTML));
+        }
+        this.drawCorrectMarkForExpression = function(idx) {
+            this.drawMarkForExpression(idx, true);
+        }
+        this.drawErrorMarkForExpression = function(idx) {
+            this.drawMarkForExpression(idx, false);
+        }
+        this.drawMarkForExpression = function (idx, isCorrect) {
+            this.svgDoc.find('.marks .mark.expression_mark[refuid="' + idx + '"]').remove();
+
+            const additionalClassName = isCorrect ? "mark_correct" :  "mark_error";
+            const innerHTML = isCorrect ? this.correctMarksHTML : this.errorMarksHTML;
+
+            const path = this.svgDoc.find('.is_plot[uid="'+idx+'"]')[0];
+            const pathDistance = path.getTotalLength() * this.expressions[idx].markAtLength;
+            const midpoint = path.getPointAtLength(pathDistance);
+
+            this.svg.text(this.svgDoc.find(".marks"), "",  {
+                "refuid": idx,
+                "class": "mark expression_mark " + additionalClassName,
+            });
+
+            const $text = this.svgDoc.find('.marks .mark.expression_mark[refuid="' + idx + '"]');
+            $text.attr("x", midpoint.x);
+            $text.attr("y", -midpoint.y);
+            $text.html(window.xssUtils.sanitize(innerHTML));
+        }
+        this.removeMarks = function() {
+            this.svgDoc.find(".marks").remove();
+            $(presenter.view).find(".mark").remove();
         }
         this.drawPlots = function() {
             $.each(this.expressions, function(idx, val) {
@@ -1629,6 +1764,45 @@
     var addonID;
     var plot = new Plot();
     presenter.isShowAnswersActive = false;
+    presenter.isGradualShowAnswersActive = false;
+    presenter.GSACounter = 0;
+    presenter.ptpShowAnswersPoints = [];
+    presenter.isPtpShowAnswersActive = false;
+
+    presenter.ERROR_CODES = {
+        'MARK_01': "Expression %expression% is invalid: mark at length must be empty or a positive number between 0 and 100",
+    };
+
+    presenter.showErrorMessage = function(message, substitutions) {
+        let errorContainer;
+        if (typeof(substitutions) == 'undefined') {
+            errorContainer = '&lt;p&gt;' + message + '&lt;/p&gt;';
+        } else {
+            let messageSubst = message;
+            for (let key in substitutions) {
+                if (!substitutions.hasOwnProperty(key)) continue;
+                messageSubst = messageSubst.replace('%' + key + '%', substitutions[key]);
+            }
+            errorContainer = '&lt;p&gt;' + messageSubst + '&lt;/p&gt;';
+        }
+
+        $(presenter.view).html(errorContainer);
+    };
+
+    function getErrorObject (errorCode, errorMessageSubstitutions) {
+        return {
+            isValid: false,
+            errorCode: errorCode,
+            errorMessageSubstitutions: errorMessageSubstitutions,
+        };
+    }
+
+    function getCorrectObject (value) {
+        return {
+            isValid: true,
+            value: value
+        };
+    }
 
     presenter.setWorkMode = function(){
         var ref;
@@ -1646,8 +1820,10 @@
             }
         });
         this.removePointsStateMarks();
+        plot.removeMarks();
         plot.enableUI(true);
     };
+
     presenter.removePointsStateMarks = function() {
         plot.svgDoc.find('.point_error').removeClass('point_error');
         plot.svgDoc.find('.point_outline_mark_error').removeClass('point_outline_mark_error');
@@ -1655,10 +1831,12 @@
         plot.svgDoc.find('.point_outline_mark_correct').removeClass('point_outline_mark_correct');
         plot.svgDoc.find('.point_outline_base').removeClass('plot_show_answers');
     };
+
     presenter.markPointAsError = function(x, y) {
         plot.svgDoc.find('.point[vx="' + x + '"][vy="' + y + '"]').addClass('point_error');
         plot.svgDoc.find('.point_outline_base[vx="' + x + '"][vy="' + y + '"]').addClass('point_outline_mark_error');
     };
+
     presenter.markPointAsCorrect = function(x, y) {
         plot.svgDoc.find('.point[vx="' + x + '"][vy="' + y + '"]').addClass('point_correct');
         plot.svgDoc.find('.point_outline_base[vx="' + x + '"][vy="' + y + '"]').addClass('point_outline_mark_correct');
@@ -1668,67 +1846,204 @@
         plot.svgDoc.find('.point_outline_base[vx="' + x + '"][vy="' + y + '"]').addClass('plot_show_answers');
     };
 
-    presenter.onEventReceived = function (eventName) {
-        if (eventName == "ShowAnswers") {
-            presenter.showAnswers();
-        }
-        if (eventName == "HideAnswers") {
-            presenter.hideAnswers();
+    presenter.onEventReceived = function (eventName, eventData) {
+         switch (eventName) {
+            case "ShowAnswers":
+                presenter.showAnswers();
+                break;
+            case "HideAnswers":
+                presenter.hideAnswers();
+                break;
+            case "GradualShowAnswers":
+                presenter.gradualShowAnswers(eventData);
+                break;
+            case "GradualHideAnswers":
+                presenter.gradualHideAnswers();
+                break;
         }
     };
 
     presenter.showAnswers = function() {
-        if(!presenter.isActivity) {
+        if (!presenter.isActivity) {
             return;
         }
 
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
-
+        presenter.errorsMode &amp;&amp; presenter.setWorkMode();
+        presenter.handleDisplayedAnswers();
         presenter.isShowAnswersActive = true;
 
-        // POINTS
-        presenter.clickedPoints = {};
-
-        $.extend( true, presenter.clickedPoints, plot.selectedPoints );
-
-        $.each(presenter.clickedPoints, function(_, point) {
-            plot._deselectPoint(point.x, point.y, true);
-        });
-
-        presenter.removePointsStateMarks();
-
-        $.each(plot.points, function(_, point) {
-            if (point.correct) {
-                presenter.setPointShowAnswersClass(point.x, point.y);
-            }
-        });
-
-        // FUNCTIONS
-        $.each(plot.expressions, function(idx, val) {
-            plot.removePlot(idx);
-        });
-
-        $.each(plot.expressions, function(idx, val) {
-            if(val.correctAnswer) {
-                plot.drawPlot(idx);
-                plot.svgDoc.find('.is_plot[uid="'+idx+'"]').addClass('show_answers').removeAttr('style');
-                plot.svgDoc.find('.is_plot[uid="'+idx+'"]').removeClass('draw_selected');
-                plot.svgDoc.find('.draw_outline_base[ouid="'+idx+'"]').addClass('show_answers');
-                plot.svgDoc.find('.draw_outline_base[ouid="'+idx+'"]').removeClass('draw_outline').removeClass('draw_"' + idx + '"_outline');
-            }
-        });
+        saveAndClearPlot();
+        showAllExpressionsAnswers();
+        showAllPointsAnswers();
 
         plot.enableUI(false);
     };
 
-    presenter.hideAnswers = function() {
-        if(!presenter.isActivity || !presenter.isShowAnswersActive) {
+    presenter.gradualShowAnswers = function(eventData) {
+        if (!presenter.isActivity || eventData.moduleID !== addonID) {
             return;
         }
-        presenter.isShowAnswersActive = false;
+        const answerIndex = parseInt(eventData.item, 10);
+        gradualShowAnswers(answerIndex);
+    };
 
+    function gradualShowAnswers(answerIndex, includePrevious = false) {
+        const isFirstGSA = !presenter.isGradualShowAnswersActive;
+        presenter.errorsMode &amp;&amp; presenter.setWorkMode();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive = true;
+        presenter.GSACounter = answerIndex;
+
+        isFirstGSA &amp;&amp; saveAndClearPlot();
+        const numberOfCorrectExpressions = plot.expressions.filter(val =&gt; val.correctAnswer).length;
+        if (answerIndex &lt; numberOfCorrectExpressions) {
+            showExpressionAnswer(answerIndex, includePrevious);
+        } else {
+            includePrevious &amp;&amp; showExpressionAnswer(numberOfCorrectExpressions - 1, includePrevious);
+            showPointAnswer(answerIndex - numberOfCorrectExpressions, includePrevious);
+        }
+
+        plot.enableUI(false);
+    }
+
+    function saveAndClearPlot() {
+        // save status of selected points
+        presenter.clickedPoints = {};
+        $.extend( true, presenter.clickedPoints, plot.selectedPoints );
+
+        // clear plot from selected points
+        $.each(presenter.clickedPoints, function(_, point) {
+            plot._deselectPoint(point.x, point.y, true);
+        });
+        presenter.removePointsStateMarks();
+
+        // clear plot from expressions
+        $.each(plot.expressions, function(idx, val) {
+            plot.removePlot(idx);
+        });
+    }
+
+    presenter.setPtpShowAnswersPoints = function(points) {
+        presenter.ptpShowAnswersPoints = points;
+    }
+
+    presenter.ptpShowAnswers = function(item) {
+        presenter.handleDisplayedAnswers();
+        presenter.isPtpShowAnswersActive = true;
+        presenter.isShowAnswersActive = false;
+        presenter.isGradualShowAnswersActive = false;
+        presenter.GSACounter = item;
+        presenter.saveAndClearPoints();
+
+        for (var i = 0; i &lt; presenter.ptpShowAnswersPoints.length &amp;&amp; i &lt;= item; i++) {
+            var point = presenter.ptpShowAnswersPoints[i];
+            presenter.setPointShowAnswersClass(point.x, point.y);
+        }
+
+        presenter.enableUI(false);
+    }
+
+    presenter.saveAndClearPoints = function() {
+        // save status of selected points
+        presenter.clickedPoints = {};
+        $.extend( true, presenter.clickedPoints, plot.selectedPoints );
+
+        // clear plot from selected points
+        $.each(presenter.clickedPoints, function(_, point) {
+            plot._deselectPoint(point.x, point.y, true);
+        });
+        presenter.removePointsStateMarks();
+    }
+
+    function showAllExpressionsAnswers() {
+        plot.expressions.forEach((expression, index) =&gt; {
+            expression.correctAnswer &amp;&amp; showExpressionAsAnswer(index);
+        })
+    }
+
+    function showExpressionAnswer(answerIndex, includePrevious = false) {
+        let currentCorrectAnswerIndex = 0;
+        for (let i = 0; i &lt; plot.expressions.length; i++) {
+            if (!plot.expressions[i].correctAnswer) {
+                continue;
+            }
+            if (currentCorrectAnswerIndex === answerIndex) {
+                showExpressionAsAnswer(i);
+                return;
+            }
+            includePrevious &amp;&amp; showExpressionAsAnswer(i);
+            currentCorrectAnswerIndex++;
+        }
+    }
+
+    function showExpressionAsAnswer (expressionIndex) {
+        plot.drawPlot(expressionIndex);
+
+        const $refObj = plot.svgDoc.find('.is_plot[uid="'+expressionIndex+'"]');
+        $refObj.addClass('show_answers');
+        $refObj.removeAttr('style');
+        $refObj.removeClass('draw_selected');
+
+        const $refObjOutline = plot.svgDoc.find('.draw_outline_base[ouid="'+expressionIndex+'"]');
+        $refObjOutline.addClass('show_answers');
+        $refObjOutline.removeClass('draw_outline');
+        $refObjOutline.removeClass('draw_"' + expressionIndex + '"_outline');
+    }
+
+    function showAllPointsAnswers() {
+        plot.points.forEach((point, index) =&gt; {
+            point.correct &amp;&amp; showPointAsAnswer(index);
+        })
+    }
+
+    function showPointAnswer(answerIndex, includePrevious = false) {
+        let currentCorrectAnswerIndex = 0;
+        for (let i = 0; i &lt; plot.points.length; i++) {
+            if (!plot.points[i].correct) {
+                continue;
+            }
+            if (currentCorrectAnswerIndex === answerIndex) {
+                showPointAsAnswer(i);
+                return;
+            }
+            includePrevious &amp;&amp; showPointAsAnswer(i);
+            currentCorrectAnswerIndex++;
+        }
+    }
+
+    function showPointAsAnswer(pointIndex) {
+        const point = plot.points[pointIndex];
+        presenter.setPointShowAnswersClass(point.x, point.y);
+    }
+
+    presenter.hideAnswers = function() {
+        if (!presenter.isActivity || !presenter.isShowAnswersActive) {
+            return;
+        }
+
+        presenter.isShowAnswersActive = false;
+        _hideAnswers();
+    };
+
+    presenter.gradualHideAnswers = function() {
+        if (!presenter.isActivity || !presenter.isGradualShowAnswersActive) {
+            return;
+        }
+
+        presenter.isGradualShowAnswersActive = false;
+        presenter.GSACounter = 0;
+        _hideAnswers();
+    };
+
+    presenter.ptpHideAnswers = function() {
+        if (!presenter.isPtpShowAnswersActive) return;
+
+        presenter.isPtpShowAnswersActive = false;
+        presenter.GSACounter = 0;
+        _hideAnswers();
+    };
+
+    function _hideAnswers() {
         // POINTS
         presenter.removePointsStateMarks();
 
@@ -1746,19 +2061,19 @@
         plot.drawPlots();
 
         plot.enableUI(true);
-    };
+    }
 
     presenter.setShowErrorsMode = function() {
         if(!presenter.isActivity) {
             return;
         }
 
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
+        presenter.handleDisplayedAnswers();
 
         var res;
         presenter.errorsMode = true;
+
+        plot.areIndividualMarks() &amp;&amp; plot.createIndividualMarksSVGDOMGroup();
         plot.enableUI(false);
 
         $.each(plot.expressions, function(idx, val) {
@@ -1767,10 +2082,12 @@
                     //mark error
                     plot.svgDoc.find('.is_plot[uid="'+idx+'"]').addClass('draw_mark_error draw_'+(parseInt(idx)+1)+'_mark_error').removeAttr('style');
                     plot.svgDoc.find('.draw_outline_base[ouid="'+idx+'"]').addClass('draw_outline_mark_error draw_'+(parseInt(idx)+1)+'_outline_mark_error');
+                    plot.areIndividualMarks() &amp;&amp; plot.drawErrorMarkForExpression(idx);
                 } else if(val.correctAnswer == true &amp;&amp; val.selected == true) {
                     //mark as correct only plots which are selectable, selected, touched and it\'s correct answer is true (selected)
                     plot.svgDoc.find('.is_plot[uid="'+idx+'"]').addClass('draw_mark_correct draw_'+(parseInt(idx)+1)+'_mark_correct').removeAttr('style');
                     plot.svgDoc.find('.draw_outline_base[ouid="'+idx+'"]').addClass('draw_outline_mark_correct draw_'+(parseInt(idx)+1)+'_outline_mark_correct');
+                    plot.areIndividualMarks() &amp;&amp; plot.drawCorrectMarkForExpression(idx);
                 }
             }
             res = plot.plotVariablesResult(idx);
@@ -1778,10 +2095,12 @@
                 //mark error
                 plot.svgDoc.find('.is_plot[uid="'+idx+'"]').addClass('draw_mark_error draw_'+(parseInt(idx)+1)+'_mark_error').removeAttr('style');
                 plot.svgDoc.find('.draw_outline_base[ouid="'+idx+'"]').addClass('draw_outline_mark_error draw_'+(parseInt(idx)+1)+'_outline_mark_error');
+                plot.areIndividualMarks() &amp;&amp; plot.drawErrorMarkForExpression(idx);
             } else if(res.todo == res.done &amp;&amp; res.todo &gt; 0 &amp;&amp; res.touched) {
                 //mark correct
                 plot.svgDoc.find('.is_plot[uid="'+idx+'"]').addClass('draw_mark_correct draw_'+(parseInt(idx)+1)+'_mark_correct').removeAttr('style');
                 plot.svgDoc.find('.draw_outline_base[ouid="'+idx+'"]').addClass('draw_outline_mark_correct draw_'+(parseInt(idx)+1)+'_outline_mark_correct');
+                plot.areIndividualMarks() &amp;&amp; plot.drawCorrectMarkForExpression(idx);
             }
         });
 
@@ -1792,9 +2111,11 @@
                     if(!val.correct &amp;&amp; res &amp;&amp; val.touched) {
                         //mark wrong
                         presenter.markPointAsError(val.x, val.y);
+                        plot.areIndividualMarks() &amp;&amp; plot.drawErrorMarkForPoint(val.x, val.y);
                     } else if(val.correct &amp;&amp; res &amp;&amp; val.touched) {
                         //mark correct
                         presenter.markPointAsCorrect(val.x, val.y);
+                        plot.areIndividualMarks() &amp;&amp; plot.drawCorrectMarkForPoint(val.x, val.y);
                     }
                 }
             });
@@ -1804,8 +2125,17 @@
                 res = presenter.grepPoints(plot.points, val);
                 if(!res) {
                     presenter.markPointAsError(val.x, val.y);
+                    plot.areIndividualMarks() &amp;&amp; plot.drawErrorMarkForPoint(val.x, val.y);
                 }
             });
+        }
+
+        if (plot.isOneMark()) {
+            if (presenter.getErrorCount() &gt; 0) {
+                plot.drawOneErrorMark();
+            } else if (presenter.getMaxScore() === presenter.getScore()) {
+                plot.drawOneCorrectMark();
+            }
         }
     };
 
@@ -1919,13 +2249,10 @@
     }
 
     presenter.reset = function(){
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
+        presenter.handleDisplayedAnswers();
 
         presenter.errorsMode = false;
         presenter._allDoneState = false;
-        presenter.isShowAnswersActive = false;
         plot.setAttempted(false);
         $.each(plot.expressions, function(idx, val) {
             val.touched = false;
@@ -1944,9 +2271,10 @@
         plot.reset();
         presenter.isVisible = presenter.initIsVisible;
         presenter.updateVisibility();
-    }
+    };
 
     presenter.run = function(view, model){
+        model = presenter.upgradeModel(model);
         presenter.errorsMode = false;
         presenter.view = view;
         presenter.model = model;
@@ -1956,9 +2284,42 @@
 
         presenter.initialize(presenter.view, presenter.model, true);
 
-        presenter.eventBus.addEventListener('ShowAnswers', this);
-        presenter.eventBus.addEventListener('HideAnswers', this);
+        const events = ["ShowAnswers", "HideAnswers", "GradualShowAnswers", "GradualHideAnswers"];
+        events.forEach((eventName) =&gt; {
+            presenter.eventBus.addEventListener(eventName, this);
+        });
     };
+
+    presenter.upgradeModel = function (model) {
+        return presenter.upgradeMarks(model);
+    };
+
+    presenter.upgradeMarks = function (model) {
+        const upgradedModel = {};
+        jQuery.extend(true, upgradedModel, model);
+
+        if (upgradedModel.hasOwnProperty("Expressions")) {
+            upgradedModel.Expressions.map(function (expression) {
+                if (!expression["mark at length"]) {
+                    expression["mark at length"] = "50";
+                }
+            });
+        }
+
+        if (!upgradedModel.hasOwnProperty("Check marks")) {
+            upgradedModel["Check marks"] = "No";
+        }
+
+        if (!upgradedModel["Correct marks HTML"]) {
+            upgradedModel["Correct marks HTML"] = "&amp;#10004;";
+        }
+
+        if (!upgradedModel["Error marks HTML"]) {
+            upgradedModel["Error marks HTML"] = "&amp;#10006;";
+        }
+
+        return upgradedModel;
+    }
 
     presenter.setPlayerController = function(controller) {
         presenter.playerController = controller;
@@ -1966,11 +2327,7 @@
     };
 
     presenter.updateVisibility = function() {
-        if(presenter.isVisible) {
-            presenter.show();
-        } else {
-            presenter.hide();
-        }
+        presenter.isVisible ? presenter.show() : presenter.hide();
     };
 
     presenter.initialize = function(view, model, isInteractive) {
@@ -2056,6 +2413,13 @@
                 };
                 el.cssColor = el.cssColorInitialValue;
                 el.visible = el.initVisible;
+
+                const validatedMarkAtLength = presenter.validateMarkAtLength(el.id, model["Expressions"][p]["mark at length"]);
+                if (!validatedMarkAtLength.isValid) {
+                    presenter.showErrorMessage(presenter.ERROR_CODES[validatedMarkAtLength.errorCode], validatedMarkAtLength.errorMessageSubstitutions);
+                    return;
+                }
+                el.markAtLength = validatedMarkAtLength.value;
                 plot.expressions.push(el);
             }
         }
@@ -2145,13 +2509,20 @@
         if(plot.yAxisValuesPosition != '' &amp;&amp; !isNaN(plot.yAxisValuesPosition)){
             plot.setYAxisValuesPosition(plot.yAxisValuesPosition);
         }
+
+        plot.checkMarks = model["Check marks"];
+        plot.correctMarksHTML = model["Correct marks HTML"];
+        plot.errorMarksHTML = model["Error marks HTML"];
     };
+
     presenter.toDotSeparator = function(value) {
         return (value + '').replace(this.decimalSeparator, '.');
     };
+
     presenter.getSeparatorByDecimalSeparator = function() {
         return this.decimalSeparator == '.' ? ',' : ';';
     };
+
     presenter.convertValueToDisplay = function(value) {
         //set correct decimal separator
         value = presenter.replaceDecimalSeparator(value);
@@ -2159,12 +2530,23 @@
         value = value.replace(new RegExp('\-', 'g'), '\u2013');
         return value;
     };
+
     presenter.replaceDecimalSeparator = function(value) {
         return (value + '').replace(new RegExp('\\.', 'g'), presenter.decimalSeparator);
     };
+
     presenter.getDecimalSeparator = function() {
         return presenter.decimalSeparator;
     };
+
+    presenter.validateMarkAtLength = function (expressionIdx, value) {
+        const percentage = presenter.valueToPercentage(value);
+        if (isNaN(percentage) || percentage &lt; 0 || percentage &gt; 1) {
+            return getErrorObject("MARK_01", {expression: expressionIdx});
+        }
+        return getCorrectObject(percentage);
+    }
+
     presenter.valueToFloat = function(val) {
         if(val === '' || val === undefined || !this.isCorrectDecimal(val)) {
             return Number.NaN;
@@ -2172,6 +2554,15 @@
          val = this.toDotSeparator(val);
          return parseFloat(val);
     };
+
+    presenter.valueToPercentage = function(value) {
+        value = parseFloat(value, 10);
+        if (isNaN(value)) {
+            return value;
+        }
+        return value/100;
+    };
+
     presenter._hasIllegalCharacters = function(word) {
         var tmpWord;
         if(this.decimalSeparator == ',') {
@@ -2183,6 +2574,7 @@
         }
         return tmpWord != word;
     };
+
     presenter.isCorrectDecimal = function(nmb) {
         if (nmb === null ||
                 ModelValidationUtils.isStringEmpty(nmb) ||
@@ -2193,7 +2585,9 @@
 
         return true;
     };
+
     presenter.createPreview = function(view, model) {
+        model = presenter.upgradeModel(model);
         presenter.errorsMode = false;
         presenter.view = view;
         presenter.model = model;
@@ -2239,7 +2633,7 @@
         if(!presenter.isVisible) {
             presenter.hide();
         }
-    }
+    };
 
     presenter.executeCommand = function(name, params) {
         switch(name.toLowerCase()) {
@@ -2301,36 +2695,37 @@
             presenter.setShowErrorsMode();
         }
     };
+
     presenter.enableUI = function(state) {
         plot.enableUI(state);
     };
-    presenter.hide = function() {
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
 
+    presenter.hide = function() {
+        presenter.handleDisplayedAnswers();
         presenter.isVisible = false;
         presenter.setVisibility(false);
     };
-    presenter.show = function() {
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
 
+    presenter.show = function() {
+        presenter.handleDisplayedAnswers();
         presenter.isVisible = true;
         presenter.setVisibility(true);
     };
+
     presenter.setVisibility = function(isVisible) {
         $(presenter.view).css("visibility", isVisible ? "visible" : "hidden");
     };
+
     presenter.getState = function() {
+        const wasShowAnswersActive = presenter.isShowAnswersActive;
+        const wasGradualShowAnswersActive = presenter.isGradualShowAnswersActive;
+        const wasPtpShowAnswersActive = presenter.isPtpShowAnswersActive;
+        const previousGSACounter = presenter.GSACounter;
+        presenter.handleDisplayedAnswers();
+
         var plotState = [];
         var variableState = [];
         var pointsState = [];
-
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
 
         $.each(plot.expressions, function(idx, val) {
             plotState[idx] = {
@@ -2366,8 +2761,12 @@
             isVisible: presenter.isVisible,
             isAttempted: presenter.isAttempted()
         });
+
+        wasShowAnswersActive &amp;&amp; presenter.showAnswers();
+        wasGradualShowAnswersActive &amp;&amp; gradualShowAnswers(previousGSACounter, true);
+        wasPtpShowAnswersActive &amp;&amp; presenter.ptpShowAnswers(previousGSACounter);
         return state;
-    }
+    };
 
     presenter.setState = function(state) {
         if(state != '' &amp;&amp; state !== undefined) {
@@ -2489,19 +2888,36 @@
     }
 
     presenter.isAttempted = function () {
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
+        presenter.handleDisplayedAnswers();
         return !this.isActivity ? true : this.getPlot().isAttempted();
-    }
+    };
 
     presenter.setAttempted = function (state) {
         this.getPlot().setAttempted(state);
-    }
+    };
 
     presenter.getPlot = function() {
         return plot;
-    }
+    };
+
+    presenter.handleDisplayedAnswers = function () {
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+        presenter.isPtpShowAnswersActive &amp;&amp; presenter.ptpHideAnswers();
+    };
+
+    presenter.isAnswersDisplayed = function () {
+        return presenter.isShowAnswersActive || presenter.isGradualShowAnswersActive;
+    };
+
+    presenter.getActivitiesCount = function () {
+        if (!presenter.isActivity) {
+            return 0;
+        }
+        const correctPointsNumber = plot.points.filter(val =&gt; val.correct).length;
+        const correctExpressionsNumber = plot.expressions.filter(val =&gt; val.correctAnswer).length;
+        return correctPointsNumber + correctExpressionsNumber;
+    };
 
     return presenter;
 }

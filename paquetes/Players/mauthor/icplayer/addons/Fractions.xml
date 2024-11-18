@@ -15,6 +15,26 @@
 		<property name="isDisable" nameLabel="Fractions_property_is_disable" type="boolean"/>
         <property displayName="Image for deselected parts" name="imageDeselect" nameLabel="Fractions_property_is_deselect" type="image"/>
         <property displayName="Image for selected parts" name="imageSelect" nameLabel="Fractions_property_is_select" type="image"/>
+		<property displayName="Speech texts" name="speechTexts" nameLabel="Fractions_property_speech_texts" type="staticlist">
+			<property name="Selected" nameLabel="Fractions_speech_text_selected" type="staticrow">
+				<property name="Selected" nameLabel="Fractions_speech_text_selected" type="string"/>
+			</property>
+			<property name="Deselected" nameLabel="Fractions_speech_text_deselected" type="staticrow">
+				<property name="Deselected" nameLabel="Fractions_speech_text_deselected" type="string"/>
+			</property>
+			<property name="Item" nameLabel="Fractions_speech_text_item" type="staticrow">
+				<property name="Item" nameLabel="Fractions_speech_text_item" type="string"/>
+			</property>
+			<property name="Correct" nameLabel="Fractions_speech_text_correct" type="staticrow">
+				<property name="Correct" nameLabel="Fractions_speech_text_correct" type="string"/>
+			</property>
+			<property name="Wrong" nameLabel="Fractions_speech_text_wrong" type="staticrow">
+				<property name="Wrong" nameLabel="Fractions_speech_text_wrong" type="string"/>
+			</property>
+			<property name="of" nameLabel="Fractions_speech_text_of" type="staticrow">
+				<property name="of" nameLabel="Fractions_speech_text_of" type="string"/>
+			</property>
+		</property>
 	</model>
 <css>.FractionsWrapper{
     width: 100%;
@@ -33,6 +53,8 @@
     presenter.currentSelected = function(){};
     var Counter = 0;
     presenter.isErrorCheckingMode = false;
+    presenter.isShowAnswersActive = false;
+    presenter.isGradualShowAnswersActive = false;
     presenter.currentSelected.item = [];
     presenter.isVisible = '';
     presenter.wasVisible = '';
@@ -43,6 +65,24 @@
     presenter.isDisable = false;
     presenter.wasDisable = false;
     presenter.imageBackgroundTable = ["0"];
+
+    presenter.isWCAGOn = false;
+    presenter.keyboardControllerObject = null;
+    presenter.markedItemColor = '#00ff44';
+    presenter.markedItemBorderData = '8,4';
+    presenter.markedItemIndex = -1;
+    presenter.orderItemIndex = -1;
+    presenter.isWCAGOn = false;
+    presenter.isFirstEnter = true;
+
+    presenter.DEFAULT_TTS_PHRASES = {
+        SELECTED: "selected",
+        DESELECTED: "deselected",
+        ITEM: "item",
+        CORRECT: "correct",
+        WRONG: "wrong",
+        OF: "of",
+    };
 
     presenter.ERROR_CODES = {
         "Z01": "None",
@@ -84,34 +124,40 @@
         }
     }
 
-
     presenter.setVisibility = function(isVisible) {
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         presenter.$view.css("visibility", isVisible ? "visible" : "hidden");
     };
 
     presenter.show = function() {
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         presenter.setVisibility(true);
         presenter.isVisible = true;
     };
 
     presenter.hide = function() {
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         presenter.setVisibility(false);
         presenter.isVisible = false;
     };
 
     presenter.disable = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+
         presenter.isDisable = true;
         var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
         $($myDiv).addClass('disable');
-
     };
 
     presenter.enable = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+
         presenter.isDisable = false;
         var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
         $($myDiv).removeClass('disable');
@@ -391,7 +437,8 @@
             figure: validatedFigure.figure,
             addonWidth: parseInt(model.Width, 10),
             addonHeight: parseInt(model.Height, 10),
-            addonId: model.ID
+            addonId: model.ID,
+            isNotActivity: ModelValidationUtils.validateBoolean(model.isNotActivity)
         };
     };
 
@@ -463,7 +510,7 @@
         }
 
         displayText();
-
+        presenter.buildKeyboardController();
     };
 
     presenter.buildSquare = function (model, view) {
@@ -612,16 +659,19 @@
     };
 
     presenter.markAsCorrect = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
         presenter.isErrorCheckingMode = true;
         $($myDiv).removeClass('incorrect');
         $($myDiv).addClass('correct');
-
     };
 
     presenter.markAsWrong = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
         presenter.isErrorCheckingMode = true;
         $($myDiv).removeClass('correct');
@@ -629,7 +679,9 @@
     };
 
     presenter.markAsEmpty = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
         presenter.isErrorCheckingMode = false;
         $($myDiv).removeClass('incorrect');
@@ -637,22 +689,29 @@
     };
 
     presenter.setSelectionColor = function(color){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         presenter.configuration.selectionColor = color;
     };
 
     presenter.setSelectionColorButton = function(color){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         presenter.configuration.selectionColor = color[0];
     };
 
     presenter.getCurrentNumber = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         return Counter;
     };
 
     presenter.isAllOK = function(){
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
 
         if(!presenter.configuration.isAnswer) {
             return true;
@@ -670,6 +729,7 @@
         var $counter = undefined;
 
         $.extend(presenter.configuration, presenter.validateModel(model, false));
+        presenter.setSpeechTexts(model['speechTexts']);
         if (!presenter.configuration.isValid) {
             $counter = $(view).find('.FractionsCommandsViewer');
             $counter.text(presenter.ERROR_CODES[presenter.configuration.errorCode]);
@@ -690,8 +750,10 @@
             presenter.wasVisible = model["Is Visible"] == 'True';
             presenter.setVisibility(presenter.isVisible);
 
-            presenter.eventBus.addEventListener('ShowAnswers', this);
-            presenter.eventBus.addEventListener('HideAnswers', this);
+            const events = ["ShowAnswers", "HideAnswers", "GradualShowAnswers", "GradualHideAnswers"];
+            for (let i = 0; i &lt; events.length; i++) {
+                presenter.eventBus.addEventListener(events[i], this);
+            }
 
             $(view).find('path').click(function (e) {
                 presenter.markElementAsClicked(this);
@@ -851,7 +913,10 @@
     presenter.markElementAsClicked = function(element){
         var correctAnswer = presenter.configuration.correctAnswer;
         var clickedElementID = element.id;
-        if(presenter.isErrorCheckingMode === false &amp;&amp; presenter.isDisable === false)
+        if (!presenter.isErrorCheckingMode
+            &amp;&amp; !presenter.isShowAnswersActive
+            &amp;&amp; !presenter.isGradualShowAnswersActive
+            &amp;&amp; !presenter.isDisable)
         {
             if(presenter.currentSelected.item[clickedElementID.slice(presenter.currentSelected.item[0].length,clickedElementID.length)] === false)
             {
@@ -1028,7 +1093,6 @@
     };
 
     presenter.getState = function () {
-        presenter.isErrorCheckingMode = false;
         var currentItems = presenter.currentSelected.item;
         var visible = presenter.isVisible;
         var initialMarks = presenter.initialMarks;
@@ -1042,7 +1106,6 @@
             wasDisable: wasDisable,
             isDisable: isDisable
         });
-
     };
 
     presenter.setState = function (state) {
@@ -1111,7 +1174,9 @@
     };
 
     presenter.setShowErrorsMode = function () {
-        presenter.hideAnswers();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         presenter.isErrorCheckingMode = true;
 
         if(presenter.configuration.isAnswer) {
@@ -1125,7 +1190,6 @@
                 }
             }
         }
-
     };
 
     presenter.setWorkMode = function () {
@@ -1133,16 +1197,17 @@
         presenter.isErrorCheckingMode = false;
         $($myDiv).removeClass('correct');
         $($myDiv).removeClass('incorrect');
-
     };
 
     presenter.reset = function () {
+        presenter.isErrorCheckingMode &amp;&amp; presenter.setWorkMode();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+
         var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
-        presenter.setWorkMode();
         for(var i = 1; i&lt; presenter.currentSelected.item.length; i++) {
             presenter.currentSelected.item[i] = false;
         }
-        presenter.isErrorCheckingMode = false;
         Counter = 0;
         presenter.initialMarks = 0;
         presenter.selected(presenter.configuration.selected.selectedString);
@@ -1173,15 +1238,28 @@
         presenter.eventBus.sendEvent('ValueChanged', eventData);
     };
 
-
-    presenter.onEventReceived = function (eventName) {
-        if (eventName == "ShowAnswers") {
-            presenter.showAnswers();
+    presenter.onEventReceived = function (eventName, eventData) {
+        switch (eventName) {
+            case "ShowAnswers":
+                presenter.showAnswers();
+                break;
+            case "HideAnswers":
+                presenter.hideAnswers();
+                break;
+            case "GradualShowAnswers":
+                presenter.gradualShowAnswers(eventData);
+                break;
+            case "GradualHideAnswers":
+                presenter.gradualHideAnswers();
+                break;
         }
+    };
 
-        if (eventName == "HideAnswers") {
-            presenter.hideAnswers();
+    presenter.getActivitiesCount = function () {
+        if (!presenter.configuration.isValid || presenter.configuration.isNotActivity) {
+            return 0;
         }
+        return 1;
     };
 
     presenter.markCorrectAnswerAsSelected = function(element){
@@ -1194,98 +1272,457 @@
         }
     };
 
+    presenter.isEnabledInGSAMode = function () {
+        // Workaround. Prevents execution of presenter.enable and thus unlocking the addon when GradualHideAnswers is executed
+        return presenter.isDisable;
+    };
+
     presenter.showAnswers = function () {
-        if(presenter.isErrorCheckingMode == true){
-            presenter.setWorkMode();
+        if (!presenter.configuration.isAnswer
+            || presenter.configuration.isNotActivity) {
+            return;
+        }
+        presenter.isErrorCheckingMode &amp;&amp; presenter.setWorkMode();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isShowAnswersActive = true;
+
+        showAnswersTo(presenter.configuration.correctAnswer);
+    };
+
+    presenter.showElementsSA = function(element){
+        presenter.isErrorCheckingMode &amp;&amp; presenter.setWorkMode();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+        presenter.isShowAnswersActive = true;
+
+        showAnswersTo(element);
+    };
+
+    presenter.gradualShowAnswers = function (eventData) {
+        if ((eventData.moduleID !== presenter.configuration.addonId)
+            || !presenter.configuration.isAnswer
+            || presenter.configuration.isNotActivity) {
+            return;
         }
 
-        presenter.isErrorCheckingMode = true; //blokowanie na check
+        presenter.isErrorCheckingMode &amp;&amp; presenter.setWorkMode();
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive = true;
 
-        if(presenter.configuration.isAnswer) {
-            if(presenter.configuration.correctAnswer != Counter){
-                if(presenter.clear()){
-                    if(Counter &lt; presenter.configuration.correctAnswer){
-                        var k = 0;
-                        for(var j = 1; j &lt; presenter.currentSelected.item.length; j++){
-                            if(presenter.currentSelected.item[j] === true) {
-                                presenter.markCorrectAnswerAsSelected(j);
-                            }
-                            if(presenter.currentSelected.item[j] === false &amp;&amp; k != presenter.configuration.correctAnswer - Counter){
-                                presenter.markCorrectAnswerAsSelected(j);
-                                k++;
-                            }
-                        }
-                    } else{
-                        var k = 0;
-                        for(var j = 1;j &lt; presenter.currentSelected.item.length; j++){
-                            if(presenter.currentSelected.item[j] === true) {
-                                if(k != presenter.configuration.correctAnswer){
-                                    presenter.markCorrectAnswerAsSelected(j);
-                                    k++;
-                                }
-                            }
+        showAnswersTo(presenter.configuration.correctAnswer);
+    };
+
+    function showAnswersTo(number) {
+        if (number != Counter){
+            presenter.clear()
+            let k = 0;
+            if (Counter &lt; number){
+                for (let j = 1; j &lt; presenter.currentSelected.item.length; j++){
+                    if (presenter.currentSelected.item[j] === true) {
+                        presenter.markCorrectAnswerAsSelected(j);
+                    }
+
+                    if (presenter.currentSelected.item[j] === false &amp;&amp; k != number - Counter){
+                        presenter.markCorrectAnswerAsSelected(j);
+                        k++;
+                    }
+                }
+            } else {
+                for (let j = 1; j &lt; presenter.currentSelected.item.length; j++){
+                    if (presenter.currentSelected.item[j] === true) {
+                        if (k != number){
+                            presenter.markCorrectAnswerAsSelected(j);
+                            k++;
                         }
                     }
                 }
             }
-            var $myDiv =  presenter.$view.find('.FractionsWrapper')[0];
-            $($myDiv).addClass('showAnswers');
         }
-    };
+        presenter.addShowAnswersClass();
+    }
 
     presenter.hideAnswers = function () {
+        if (!presenter.isShowAnswersActive
+            &amp;&amp; !presenter.isGradualShowAnswersActive) {
+            return;
+        }
+        presenter.isErrorCheckingMode &amp;&amp; presenter.setWorkMode();
 
-        var $myDiv = presenter.$view.find('.FractionsWrapper')[0];
-        presenter.isErrorCheckingMode = false;
-        $($myDiv).removeClass('showAnswers');
+        presenter.isShowAnswersActive = false;
+        presenter.isGradualShowAnswersActive = false;
+        presenter.removeShowAnswersClass();
         presenter.clear();
 
-        for(var j = 1; j &lt; presenter.currentSelected.item.length; j++){
-            if(presenter.currentSelected.item[j] === true) {
+        for (let j = 1; j &lt; presenter.currentSelected.item.length; j++){
+            if (presenter.currentSelected.item[j] === true) {
                 presenter.markCorrectAnswerAsSelected(j);
             }
         }
         return true;
     };
 
-    presenter.showElementsSA = function(element){
-
-        var correctAnswerSA = element;
-        presenter.isErrorCheckingMode = true;
-        if(correctAnswerSA != Counter){
-            if(presenter.clear()){
-                if(Counter &lt; correctAnswerSA){
-                    var k = 0;
-                    for(var j = 1; j &lt; presenter.currentSelected.item.length; j++){
-                        if(presenter.currentSelected.item[j] === true) {
-                            presenter.markCorrectAnswerAsSelected(j);
-                        }
-                        if(presenter.currentSelected.item[j] === false &amp;&amp; k != correctAnswerSA - Counter){
-                            presenter.markCorrectAnswerAsSelected(j);
-                            k++;
-                        }
-                    }
-                } else{
-                    var k = 0;
-                    for(var j = 1; j &lt; presenter.currentSelected.item.length; j++){
-                        if(presenter.currentSelected.item[j] === true) {
-                            if(k != correctAnswerSA){
-                                presenter.markCorrectAnswerAsSelected(j);
-                                k++;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        var $myDiv = presenter.$view.find('.FractionsWrapper')[0];
-        $($myDiv).addClass('showAnswers');
-    };
-
     presenter.hideElementsSA = function(item){
         presenter.hideAnswers();
     };
+
+    presenter.gradualHideAnswers = function() {
+        presenter.hideAnswers();
+    };
+
+    presenter.keyboardController = function(keycode, isShiftDown, event) {
+        event.preventDefault();
+
+        const keys = {
+            ENTER: 13,
+            ESCAPE: 27,
+            SPACE: 32,
+            ARROW_LEFT: 37,
+            ARROW_UP: 38,
+            ARROW_RIGHT: 39,
+            ARROW_DOWN: 40,
+            TAB: 9
+        };
+
+        switch (keycode) {
+            case keys.ENTER:
+                presenter.enter(event);
+                break;
+            case keys.ESCAPE:
+                presenter.escape();
+                break;
+            case keys.SPACE:
+                presenter.select();
+                break;
+            case keys.ARROW_LEFT:
+                presenter.leftArrowHandler();
+                break;
+            case keys.ARROW_UP:
+                presenter.previousRow();
+                break;
+            case keys.ARROW_RIGHT:
+                presenter.rightArrowHandler();
+                break;
+            case keys.ARROW_DOWN:
+                presenter.nextRow();
+                break;
+            case keys.TAB:
+                presenter.tabHandler(isShiftDown);
+                break;
+        }
+    };
+
+    presenter.tabHandler = function (isShiftDown) {
+        if (isShiftDown) {
+            presenter.previousElement();
+        } else {
+            presenter.nextElement();
+        }
+    }
+
+    presenter.leftArrowHandler = function () {
+        if (presenter.isSquareSelected() || presenter.isCircleSelected()) {
+            presenter.nextElement();
+        } else {
+            presenter.previousElement();
+        }
+    }
+
+    presenter.rightArrowHandler = function () {
+        if (presenter.isSquareSelected() || presenter.isCircleSelected()) {
+            presenter.previousElement();
+        } else {
+            presenter.nextElement();
+        }
+    }
+
+    presenter.buildKeyboardController = function () {
+        presenter.keyboardControllerObject
+            = new FractionsKeyboardController(
+                presenter.$view,
+                presenter.getNumberOfElements()
+        );
+    };
+
+    presenter.getNumberOfElements = function () {
+        switch (presenter.configuration.figure) {
+            case presenter.FIGURES.CIRCLE:
+                return presenter.configuration.circleParts;
+
+            case presenter.FIGURES.RECTANGULAR:
+                return presenter.configuration.rectHorizontal * presenter.configuration.rectVertical;
+
+            case presenter.FIGURES.SQUARE:
+                return presenter.configuration.squareParts;
+        }
+    };
+
+    presenter.setWCAGStatus = function(isWCAGOn) {
+        presenter.isWCAGOn = isWCAGOn;
+    };
+
+    function FractionsKeyboardController (elements, elementsCount) {
+        KeyboardController.call(this, elements, elementsCount);
+    }
+
+    FractionsKeyboardController.prototype = Object.create(window.KeyboardController.prototype);
+    FractionsKeyboardController.prototype.constructor = FractionsKeyboardController;
+
+    presenter.exitWCAGMode = function () {
+        presenter.setWCAGStatus(false);
+        presenter.removeMarkedElement();
+        presenter.isFirstEnter = true;
+    }
+
+    presenter.select = function () {
+        const element = $(`#${presenter.configuration.addonId}${presenter.markedItemIndex}`);
+
+        presenter.markElementAsClicked(element.get(0));
+
+        presenter.readOnSelect();
+    }
+
+    presenter.enter = function (event) {
+        if (event.ctrlKey || event.shiftKey) {
+            presenter.exitWCAGMode();
+            return;
+        }
+
+        if (presenter.isFirstEnter) {
+            presenter.markedItemIndex = 1;
+            presenter.orderItemIndex = 1;
+            presenter.markItem(1);
+        }
+
+        presenter.readOnEnter();
+        presenter.isFirstEnter = false;
+    }
+
+    presenter.nextElement = function () {
+        presenter.increaseIndex();
+        presenter.markItem(presenter.markedItemIndex);
+
+        presenter.readMarkedElement();
+    };
+
+    presenter.previousElement = function () {
+        presenter.decreaseIndex();
+        presenter.markItem(presenter.markedItemIndex);
+
+        presenter.readMarkedElement();
+    };
+
+    presenter.previousRow = function () {
+        if (presenter.isSquareSelected() || presenter.isCircleSelected()) {
+            presenter.increaseIndex();
+            presenter.markItem(presenter.markedItemIndex);
+        } else {
+            const offset = presenter.markedItemIndex - presenter.configuration.rectHorizontal &lt; 1 ? presenter.markedItemIndex : presenter.markedItemIndex - presenter.configuration.rectHorizontal;
+            presenter.markedItemIndex = offset;
+            presenter.orderItemIndex = offset;
+            presenter.markItem(presenter.markedItemIndex);
+        }
+
+        presenter.readMarkedElement();
+    };
+
+    presenter.nextRow = function () {
+        if (presenter.isSquareSelected() || presenter.isCircleSelected()) {
+            presenter.decreaseIndex();
+            presenter.markItem(presenter.markedItemIndex);
+        } else {
+            const totalElements = presenter.configuration.rectHorizontal * presenter.configuration.rectVertical
+            const offset = presenter.markedItemIndex + presenter.configuration.rectHorizontal &gt; totalElements ? presenter.markedItemIndex : presenter.markedItemIndex + presenter.configuration.rectHorizontal;
+            presenter.markedItemIndex = offset;
+            presenter.orderItemIndex = offset;
+            presenter.markItem(presenter.markedItemIndex);
+        }
+
+        presenter.readMarkedElement();
+    };
+
+    presenter.escape = function () {
+        presenter.removeMarkedElement();
+        presenter.isFirstEnter = true;
+    }
+
+    presenter.isSquareSelected = function () {
+        return presenter.configuration.figure === presenter.FIGURES.SQUARE;
+    }
+
+    presenter.isCircleSelected = function () {
+        return presenter.configuration.figure === presenter.FIGURES.CIRCLE;
+    }
+
+    presenter.increaseIndex = function () {
+        presenter.orderItemIndex += 1;
+        presenter.updateMarkedItemIndex();
+        if (presenter.isSquareSelected()) {
+            presenter.markedItemIndex = getIndexesInOrder(presenter.configuration.squareParts)[presenter.orderItemIndex - 1];
+        } else {
+            presenter.markedItemIndex = presenter.orderItemIndex;
+        }
+    }
+
+    presenter.decreaseIndex = function () {
+        presenter.orderItemIndex -= 1;
+        presenter.updateMarkedItemIndex();
+        if (presenter.isSquareSelected()) {
+            presenter.markedItemIndex = getIndexesInOrder(presenter.configuration.squareParts)[presenter.orderItemIndex - 1];
+        } else {
+            presenter.markedItemIndex = presenter.orderItemIndex;
+        }
+    }
+
+    presenter.markItem = function (itemIndex) {
+        const dItemValue = $(`#${presenter.configuration.addonId}${itemIndex}`).attr('d')
+        presenter.removeMarkedElement();
+
+        const newElement = document.createElementNS("http://www.w3.org/2000/svg", 'path'); //Create a path in SVG's namespace
+        newElement.setAttribute("d",dItemValue);
+        newElement.setAttribute('id', 'Fractions-keyboard-nav')
+        newElement.style.stroke = presenter.markedItemColor;
+        newElement.style.strokeWidth = presenter.configuration.strokeWidth;
+        newElement.style.strokeDasharray = presenter.markedItemBorderData;
+        newElement.style.fill = 'transparent';
+        newElement.style.strokeLinejoin = 'round';
+        newElement.classList.add(presenter.configuration.addonId);
+
+        const $addonElement = $(`#${presenter.configuration.addonId}`);
+        const svg = $addonElement.find('.FractionsWrapper').get(0).children[0];
+        svg.appendChild(newElement);
+    }
+
+    presenter.removeMarkedElement = function () {
+        const element = document.getElementById('Fractions-keyboard-nav');
+        if (element?.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    }
+
+    presenter.updateMarkedItemIndex = function () {
+        const elementsCount = presenter.getNumberOfElements();
+        if (presenter.orderItemIndex &gt; elementsCount) {
+            presenter.orderItemIndex = 1;
+        } else if (presenter.orderItemIndex &lt; 1) {
+            presenter.orderItemIndex = elementsCount;
+        }
+    }
+
+    presenter.isMarkedElementSelected = function () {
+        const element$ = $(`#${presenter.configuration.addonId}${presenter.markedItemIndex}`);
+
+        return element$.hasClass('selected');
+    }
+
+    presenter.getTextToSpeechOrNull = function () {
+        if (presenter.playerController) {
+            return presenter.playerController.getModule('Text_To_Speech1');
+        }
+
+        return null;
+    };
+
+    presenter.speak = function (data) {
+        const tts = presenter.getTextToSpeechOrNull();
+
+        if (tts &amp;&amp; presenter.isWCAGOn) {
+            tts.speak(data);
+        }
+    };
+
+    presenter.setWCAGStatus = function(isWCAGOn) {
+        presenter.isWCAGOn = isWCAGOn;
+    };
+
+    presenter.setSpeechTexts = function(speechTexts) {
+        presenter.speechTexts = {
+            Selected: presenter.DEFAULT_TTS_PHRASES.SELECTED,
+            Deselected: presenter.DEFAULT_TTS_PHRASES.DESELECTED,
+            Item: presenter.DEFAULT_TTS_PHRASES.ITEM,
+            Correct: presenter.DEFAULT_TTS_PHRASES.CORRECT,
+            Wrong: presenter.DEFAULT_TTS_PHRASES.WRONG,
+            of: presenter.DEFAULT_TTS_PHRASES.OF,
+        };
+
+        if (!speechTexts || $.isEmptyObject(speechTexts)) {
+            return;
+        }
+
+        presenter.speechTexts = {
+            Selected: TTSUtils.getSpeechTextProperty(
+                speechTexts.Selected.Selected,
+                presenter.speechTexts.Selected),
+            Deselected: TTSUtils.getSpeechTextProperty(
+                speechTexts.Deselected.Deselected,
+                presenter.speechTexts.Deselected),
+            Item: TTSUtils.getSpeechTextProperty(
+                speechTexts.Item.Item,
+                presenter.speechTexts.Item),
+            Correct: TTSUtils.getSpeechTextProperty(
+                speechTexts.Correct.Correct,
+                presenter.speechTexts.Correct),
+            Wrong: TTSUtils.getSpeechTextProperty(
+                speechTexts.Wrong.Wrong,
+                presenter.speechTexts.Wrong),
+            of: TTSUtils.getSpeechTextProperty(
+                speechTexts.of.of,
+                presenter.speechTexts.of),
+        };
+    };
+    
+    presenter.readOnEnter = function () {
+        const textVoiceObject = [];
+        const numberOfSelectedItems = presenter.getNumberOfSelectedItems().toString();
+        const numberOfAllItems = (presenter.currentSelected.item.length - 1).toString();
+        let text = [presenter.speechTexts.Selected, numberOfSelectedItems, presenter.speechTexts.of, numberOfAllItems].join(' ');
+
+        if (presenter.isErrorCheckingMode) {
+            text += ` ${presenter.getSelectionMark(+numberOfSelectedItems)}`;
+        }
+        pushMessageToTextVoiceObject(textVoiceObject, text);
+
+        if (presenter.isFirstEnter &amp;&amp; !presenter.isErrorCheckingMode &amp;&amp; !presenter.isShowAnswersActive) {
+            const option = presenter.isMarkedElementSelected() ? presenter.speechTexts.Selected : presenter.speechTexts.Deselected;
+            const selectionText = [presenter.speechTexts.Item, "1", option].join(' ');
+            pushMessageToTextVoiceObject(textVoiceObject, selectionText);
+        }
+
+        presenter.speak(textVoiceObject);
+    }
+
+    presenter.getNumberOfSelectedItems = function () {
+        if (presenter.isShowAnswersActive) {
+            return presenter.configuration.correctAnswer;
+        }
+        return presenter.currentSelected.item.filter(_item =&gt; _item === true).length;
+    }
+
+    presenter.getSelectionMark = function (userSelectedItems) {
+        if (userSelectedItems === presenter.configuration.correctAnswer) {
+            return presenter.speechTexts.Correct;
+        }
+        return presenter.speechTexts.Wrong;
+    }
+
+    presenter.readMarkedElement = function () {
+        const textVoiceObject = [];
+        const option = presenter.isMarkedElementSelected() ? presenter.speechTexts.Selected : presenter.speechTexts.Deselected;
+        const text = [presenter.speechTexts.Item, presenter.orderItemIndex, option].join(' ');
+        pushMessageToTextVoiceObject(textVoiceObject, text);
+
+        presenter.speak(textVoiceObject);
+    }
+
+    presenter.readOnSelect = function () {
+        const textVoiceObject = [];
+        const option = presenter.isMarkedElementSelected() ? presenter.speechTexts.Selected : presenter.speechTexts.Deselected;
+        pushMessageToTextVoiceObject(textVoiceObject, option);
+
+        presenter.speak(textVoiceObject);
+    }
+
+    function pushMessageToTextVoiceObject(textVoiceObject, message) {
+        textVoiceObject.push(window.TTSUtils.getTextVoiceObject(message));
+    }
 
     var SquareShapeElement = function (width, height, x, y, currentCutIndex, id) {
         this.width = Math.min(width, height);
@@ -1466,6 +1903,42 @@
         }
         return elements;
     };
+
+    function getIndexesInOrder(numberOfElements) {
+        switch (numberOfElements) {
+            case 1:
+                return [1];
+            case 4:
+                return [1, 2, 4, 3];
+            case 8:
+                return [1, 2, 4, 3, 7, 8, 6, 5];
+            default:
+                return calculateIndexesInOrder(numberOfElements);
+        }
+    }
+
+    function calculateIndexesInOrder(numberOfElements) {
+        const offset = (numberOfElements / 8) // 8 come from 4 side each divided on 2
+
+        return [1,
+            ...getIncrementIndexes(1+offset, offset),
+            ...getDecrementIndexes(4*offset, offset),
+            ...getIncrementIndexes(1+2*offset, offset),
+            ...getDecrementIndexes(7*offset, offset),
+            ...getIncrementIndexes(1+7*offset, offset),
+            ...getDecrementIndexes(6*offset, offset),
+            ...getIncrementIndexes(1+4*offset, offset),
+            ...getDecrementIndexes(offset, offset-1),
+        ]
+    }
+
+    function getIncrementIndexes(startIndex, offset) {
+        return Array.from({length: offset}, (_, i) =&gt; startIndex + i);
+    }
+
+    function getDecrementIndexes(endIndex, offset) {
+        return Array.from({length: offset}, (_, i) =&gt; endIndex - i);
+    }
 
     return presenter;
 }

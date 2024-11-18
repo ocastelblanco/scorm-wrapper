@@ -171,6 +171,7 @@
 
     presenter.validateModel = function(model) {
         return {
+            addonID: model['ID'],
             showProgressBar: ModelValidationUtils.validateBoolean(model['Show_Progress_Bar']),
 			progressBarText: model['Progress_Bar_text'],
             showChecks: ModelValidationUtils.validateBoolean(model['Show_Checks']),
@@ -215,11 +216,6 @@
 			var score = presenter.playerController.getScore().getPageScoreById(pageId);
 			presenter.lastScores.sumOfMaxScore = score.maxScore;
 			presenter.displayScores(presenter.lastScores);
-			presenter.view.addEventListener('DOMNodeRemoved', function onDOMNodeRemoved(event) {
-				if (event.target === this) {
-					presenter.destroy();
-				}
-			});
 			presenter.view.addEventListener('ShowAnswers', this);
 		}
 
@@ -239,10 +235,6 @@
 		presenter.lastScores.sumOfChecks = score.checkCount;
 		presenter.displayScores(presenter.lastScores);
 	};
-
-    presenter.destroy = function (event) {
-        presenter.view.removeEventListener('DOMNodeRemoved', presenter.destroy);
-    };
 
     function removeHidden(shouldRemove, $element) {
         if (shouldRemove) {
@@ -268,7 +260,7 @@
             var percentageScore = (score.score*100.0) / score.maxScore;
         }
         return {
-            progress: parseInt(percentageScore, 10),
+            progress: Math.round(percentageScore),
             sumOfMaxScore: score.maxScore,
             sumOfMistakes: score.mistakeCount,
             sumOfErrors: score.errorCount,

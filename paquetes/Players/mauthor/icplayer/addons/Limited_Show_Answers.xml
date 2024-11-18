@@ -99,6 +99,7 @@
     };
 
     presenter.sendEvent = function (eventName) {
+        if(!presenter.eventBus) return;
         var eventData = {
             'value': eventName,
             'source': presenter.configuration.addonID,
@@ -131,6 +132,10 @@
 
     presenter.createPreview = function (view, model) {
         presenter.presenterLogic(view, model, true);
+    };
+
+    presenter.getWorksWithModulesList = function () {
+        return presenter.configuration.worksWithModulesList.slice();
     };
 
     presenter.validateModel = function (model) {
@@ -255,15 +260,14 @@
         presenter.view = view;
         presenter.presenterLogic(view, model, false);
 
-        presenter.view.addEventListener("DOMNodeRemoved", presenter.destroy);
+        MutationObserverService.createDestroyObserver(presenter.configuration.addonID, presenter.destroy, presenter.view);
+        MutationObserverService.setObserver();
     };
 
     presenter.destroy = function (event) {
         if (event.target !== presenter.view) {
             return;
         }
-
-        presenter.view.removeEventListener("DOMNodeRemoved", presenter.destroy);
         presenter.$button.off();
         presenter.$view.off();
 

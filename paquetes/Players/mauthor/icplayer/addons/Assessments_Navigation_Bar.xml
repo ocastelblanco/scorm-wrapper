@@ -5,6 +5,9 @@
         <property displayName="Number of buttons" name="userButtonsNumber" nameLabel="Assessments_Navigation_Bar_property_number_of_buttons" type="string"/>
         <property displayName="Width of buttons" name="userButtonsWidth" nameLabel="Assessments_Navigation_Bar_property_width_of_buttons" type="string"/>
         <property displayName="Default order" name="defaultOrder" nameLabel="Assessments_Navigation_Bar_property_default_order" type="boolean"/>
+        <property displayName="Use dynamic pagination" name="useDynamicPagination" nameLabel="Assessments_Navigation_Bar_property_use_dynamic_pagination" type="boolean"/>
+        <property displayName="Expandable ANB sections" name="enableDropdownPagesList" nameLabel="Assessments_Navigation_Bar_property_enable_dropdown_pages_list" type="boolean"/>
+        <property displayName="Enable redirect to page" name="enableRedirectToPage" nameLabel="Assessments_Navigation_Bar_property_enable_redirect_to_page" type="boolean"/>
         <property displayName="Speech texts" name="speechTexts" nameLabel="Assessments_Navigation_Bar_property_speech_texts" type="staticlist">
             <property name="PreviousPage" nameLabel="Assessments_Navigation_Bar_speech_text_previous_page" type="staticrow">
                 <property name="PreviousPage" nameLabel="Assessments_Navigation_Bar_speech_text_previous_page" type="string"/>
@@ -54,13 +57,28 @@
     height: 100%;
 }
 
+.assessments-navigation-bar-wrapper .sections.enable-dropdown {
+    display: flex;
+    flex-direction: row;
+    height: 100%;
+    gap: 10px;
+}
+
 .assessments-navigation-bar-wrapper .section {
     display: inline-block;
     height: 100%;
 }
 
+.assessments-navigation-bar-wrapper .section.expandable-section {
+    position: relative;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
 .assessments-navigation-bar-wrapper .section_name {
     text-align: center;
+    text-wrap: nowrap;
     height: 20%;
 }
 
@@ -70,8 +88,25 @@
     height: 100%;
 }
 
+.assessments-navigation-bar-wrapper .buttons.dropdown-list .element {
+    display: grid;
+    text-align: center;
+    width: 100%;
+    height: 100%;
+}
+
 .assessments-navigation-bar-wrapper .buttons {
     height: 80%;
+}
+
+.assessments-navigation-bar-wrapper .buttons.dropdown-list {
+    width: 100%;
+    height: auto !important;
+    top: 40px;
+    display: none;
+    flex-direction: column;
+    position: absolute;
+    background-color: beige;
 }
 
 .assessments-navigation-bar-wrapper .button_text {
@@ -93,6 +128,23 @@
 
 .assessments-navigation-bar-wrapper .bookmark {
     color: red;
+}
+
+@media screen and (max-width: 450px) {
+    .addon_Assessments_Navigation_Bar.enabled-page-list {
+        width: 400px !important;
+        overflow-x: scroll;
+        overflow-y: hidden;
+        background: none;
+        box-shadow: none;
+        scroll-behavior: smooth;
+        z-index: 1;
+    }
+
+    /* hide scroll bar*/
+    .addon_Assessments_Navigation_Bar.enabled-page-list::-webkit-scrollbar {
+        display: none;
+    }
 }
 </css><view>&lt;div class="assessments-navigation-bar-wrapper"&gt;
     &lt;div class="navigation-buttons-first"&gt;
@@ -135,6 +187,10 @@
     presenter.isWCAGOn = false;
     presenter.SECTION_NAME_HEIGHT = 20;
     presenter.isFirstEnter = true;
+    presenter.isPageListNavigationActive = false;
+    presenter.currentSelectedChapterIndex = -1;
+    presenter.currentSelectedChapterName = '';
+    presenter.previousSectionsBarHeight = 0;
 
     presenter.ERROR_MESSAGES = {
         S_00: "Section property cant be empty string",
@@ -150,6 +206,7 @@
         S_10: "Buttons width property have to be an integer",
         S_11: "Pages CSS classes are invalid on section: %section% in sections property. Number of CSS classes is too small.",
         S_12: "Pages CSS classes are invalid on section: %section% in sections property. At least one of CSS classes is invalid.",
+        S_13: "Static position value in section %section% is invalid: the value must be 'left', 'right', or left empty."
     };
 
     presenter.DEFAULT_TTS_PHRASES = {
@@ -173,7 +230,11 @@
         TURN_FORWARD: "turn_forward",
         CURRENT_PAGE: "current_page",
         BOOKMARK: "bookmark",
-        INACTIVE: "inactive"
+        INACTIVE: "inactive",
+        ENABLED_PAGE_LIST: "enabled-page-list",
+        CURRENT_SECTION: "current-section",
+        SELECTED: "selected",
+        VISIBLE_PAGE_LIST: "visible-page-list",
     };
 
     presenter.attemptedButtons = [];
@@ -351,9 +412,10 @@
         return a;
     }
 
-    presenter.Button = function (viewDescription, customCssClassNames) {
+    presenter.Button = function (viewDescription, customCssClassNames, isPageButton) {
         this.description = viewDescription;
         this.customCssClassNames = customCssClassNames;
+        this.isPageButton = isPageButton;
         this.$view = this.createView();
         this.$view_text;
         this.actualCommand;
@@ -429,14 +491,19 @@
 
     presenter.Button.prototype.createView = function () {
         var $view = $('&lt;div&gt;&lt;/div&gt;');
+        const elementWidth = presenter.configuration.enableDropdownPagesList &amp;&amp; this.isPageButton ? '100%' : `${presenter.configuration.sizes.elementWidth}px`;
 
         $view.css({
-            width: presenter.configuration.sizes.elementWidth + "px"
+            width: elementWidth
         });
 
         this.$view_text = $('&lt;div&gt;&lt;/div&gt;');
         this.$view_text.text(this.description);
         this.$view_text.addClass(presenter.CSS_CLASSES.BUTTON_TEXT);
+
+        if (presenter.configuration.enableDropdownPagesList &amp;&amp; this.isPageButton) {
+            this.$view_text.css({width: elementWidth});
+        }
 
         $view.append(this.$view_text);
         $view.addClass(presenter.CSS_CLASSES.BUTTON);
@@ -499,13 +566,18 @@
     presenter.HellipButton.prototype = Object.create(presenter.Button.prototype);
     presenter.HellipButton.constructor = presenter.HellipButton;
 
-    presenter.Page = function (page, view_description, sectionName, sectionCssClass, buttonCssClassNames) {
+    presenter.Page = function (page, view_description, sectionName, sectionCssClass, buttonCssClassNames, staticPosition) {
         this.description = view_description;
         this.page = page;
         this.isBookmarkOn = false;
         this.sectionName = sectionName;
         this.sectionCssClass = sectionCssClass;
         this.buttonCssClassNames = buttonCssClassNames;
+        if (staticPosition === undefined) {
+            this.staticPosition = '';
+        } else {
+            this.staticPosition = staticPosition;
+        }
     };
 
     presenter.Page.prototype.setBookmarkOn = function (bookmark) {
@@ -531,10 +603,11 @@
         return presenter.currentPageIndex === this.page;
     };
 
-    presenter.Section = function (pages, sectionName, pagesDescriptions, sectionCssClassName, buttonsCssClassNames) {
+    presenter.Section = function (pages, sectionName, pagesDescriptions, sectionCssClassName, buttonsCssClassNames, staticPosition) {
         this.name = sectionName;
         this.cssClassName = sectionCssClassName;
         this.buttonsCssClassNames = buttonsCssClassNames;
+        this.staticPosition = staticPosition;
         this.pages = this.createPages(pages, pagesDescriptions);
     };
 
@@ -550,18 +623,33 @@
         } else if (presenter.randomizeLesson != null) {
             keepDefaultOrder = !presenter.randomizeLesson;
         }
+
+        if (isTestGeneratorPreview()) {
+            keepDefaultOrder = true;
+        }
+
         var pagesToCreate = keepDefaultOrder ? pages : shuffleArray(pages);
 
         return pagesToCreate.map(function (page, index) {
             if (page == -1) return null;
             return new presenter.Page(
                 page, pagesDescriptions[index], this.name,
-                this.cssClassName, this.buttonsCssClassNames
+                this.cssClassName, this.buttonsCssClassNames,
+                this.staticPosition
             );
         }, this).filter(function(page) {
             return page != null;
         });
     };
+
+    // keep default page order in test generator preview
+    function isTestGeneratorPreview() {
+        if (!presenter.playerController || presenter.playerController.isPlayerInCrossDomain()) {
+            return false;
+        }
+        const parentUrl = window.parent?.location.href;
+        return parentUrl.includes('lesson/view/assessment') &amp;&amp; parentUrl.includes('preview');
+    }
 
     presenter.Sections = function (sections) {
         this.sections = this.createSections(sections);
@@ -669,25 +757,42 @@
     presenter.Sections.prototype.getPages = function (leftIndex, numberOfPages) {
         var pages = [];
 
-        if (leftIndex + numberOfPages &gt;= this.allPages.length) {
-            leftIndex = ((this.allPages.length) - numberOfPages)
+        var standardPages = [];
+        for (var i = 0; i &lt; this.allPages.length; i++) {
+            if (this.allPages[i].staticPosition === undefined || this.allPages[i].staticPosition.length === 0) {
+                standardPages.push(this.allPages[i]);
+            }
+        }
+
+        if (leftIndex + numberOfPages &gt;= standardPages.length) {
+            leftIndex = ((standardPages.length) - numberOfPages);
         }
 
         if (leftIndex &lt; 0) {
             leftIndex = 0;
         }
 
-        for (var i = leftIndex; i &lt; this.allPages.length; i++) {
+        for (var i = leftIndex; i &lt; standardPages.length; i++) {
             if (numberOfPages == 0) {
                 break;
             }
 
-            pages.push(this.allPages[i]);
+            pages.push(standardPages[i]);
             numberOfPages--;
         }
 
         return pages;
     };
+
+    presenter.Sections.prototype.getStaticPages = function () {
+        var pages = [];
+        for (var i = 0; i &lt; this.allPages.length; i++) {
+            if (this.allPages[i].staticPosition &amp;&amp; this.allPages[i].staticPosition.length &gt; 0) {
+                pages.push(this.allPages[i]);
+            }
+        }
+        return pages;
+    }
 
     presenter.filterSectionsWithTooManyPages = function(sections) {
         var mapping = presenter.playerController.getPagesMapping();
@@ -727,7 +832,8 @@
                 return new presenter.Section(
                     section.pages, section.sectionName,
                     section.pagesDescriptions, sectionCssClass,
-                    section.sectionButtonsCssClassNames
+                    section.sectionButtonsCssClassNames,
+                    section.staticPosition
                 );
         });
     };
@@ -743,8 +849,104 @@
         this.$sections;
         this.buttons = [];
         this.shiftCount = 0;
+        this.leftOffset = 0;
+        this.nextPrevBtnWasClicked = false;
 
         this.initView();
+    };
+
+    presenter.NavigationManager.prototype.isBackButtonVisible = function () {
+        return presenter.$wrapper.find("." + presenter.CSS_CLASSES.TURN_BACK).length;
+    };
+
+    presenter.NavigationManager.prototype.getNumberOfNavElements = function () {
+        return this.isBackButtonVisible() ? 4 : 3;
+    };
+
+    presenter.NavigationManager.prototype.calculateLeftOffset = function (previousLeftSideValue, nextPrevBtnWasClicked) {
+        const currentIndex = presenter.playerController.getCurrentPageIndex();
+        const staticPages = presenter.configuration.numberOfStaticPages;
+        const navElements = this.getNumberOfNavElements();
+        const rightSideIndex = previousLeftSideValue + presenter.configuration.numberOfButtons - navElements - staticPages;
+        const isBackButtonVisible = this.isBackButtonVisible();
+
+        if (rightSideIndex === (currentIndex + 1)) {
+            this.setLeftOffset(1);
+        }
+
+        // situation when there are static pages and show next page was clicked
+        if (rightSideIndex === currentIndex &amp;&amp; nextPrevBtnWasClicked &amp;&amp; !isBackButtonVisible) {
+            this.setLeftOffset(1);
+        }
+
+        if (previousLeftSideValue === currentIndex) {
+            this.setLeftOffset(0);
+        }
+    };
+
+    presenter.NavigationManager.prototype.setLeftOffset = function (leftOffset) {
+        this.leftOffset = leftOffset;
+    };
+
+    presenter.NavigationManager.prototype.getLeftSideIndex = function () {
+        return this.leftSideIndex;
+    };
+
+    presenter.NavigationManager.prototype.setLeftSideIndex = function (previousLeftSideIndex, previousLeftSideValue) {
+        if (!presenter.configuration.useDynamicPagination) {
+            return;
+        }
+
+        const navElements = this.getNumberOfNavElements();
+        const currentIndex = presenter.playerController.getCurrentPageIndex();
+        const numberOfButtonsInShift = presenter.configuration.numberOfButtons - navElements;
+        const actualCurrentIndex = this.getLeftIndex(currentIndex);
+        if (previousLeftSideIndex &gt;= this.actualPages.length || previousLeftSideIndex &lt; 0) {
+            previousLeftSideIndex = this.getLeftIndex(previousLeftSideValue);
+        }
+
+        if (this.staticPages.length) {
+            if (currentIndex &lt;= previousLeftSideValue) {
+                this.leftSideIndex = actualCurrentIndex - 1;
+                this.setIndexToFirst(this.leftSideIndex);
+            } else {
+                this.leftSideIndex = previousLeftSideIndex;
+            }
+            this.shiftCount = Math.floor((this.leftSideIndex + 1) / numberOfButtonsInShift);
+        }
+
+        if (this.staticPages.length === 0) {
+            const staticPages = presenter.configuration.numberOfStaticPages;
+            const rightSideIndex = previousLeftSideValue + presenter.configuration.numberOfButtons - navElements - staticPages;
+            if (currentIndex &lt;= previousLeftSideValue) {
+                const actualCurrentIndex = this.getLeftIndex(currentIndex);
+                this.leftSideIndex = actualCurrentIndex - 1;
+                this.setIndexToFirst(this.leftSideIndex);
+                this.setLeftOffset(0);
+            } else if (currentIndex - rightSideIndex &gt;= -1) {
+                this.setLeftOffset(1);
+            } else {
+                this.leftSideIndex = previousLeftSideIndex;
+                this.setLeftOffset(0);
+            }
+
+            this.shiftCount = Math.floor((this.leftSideIndex + 1) / numberOfButtonsInShift);
+        }
+    };
+
+    presenter.NavigationManager.prototype.setIndexToFirst = function (index) {
+        if (index !== 1) { return; }
+        try {
+            const page = presenter.sections.allPages[1];
+            const _page = this.actualPages[index];
+            if (page.description === _page.description) {
+                this.leftSideIndex = 0;
+            }
+        } catch (e) {}
+    };
+
+    presenter.NavigationManager.prototype.getLeftIndex = function (previousLeftSideValue) {
+        return this.actualPages.findIndex((page) =&gt; page.page === previousLeftSideValue);
     };
 
     presenter.NavigationManager.prototype.restartLeftSideIndex = function () {
@@ -753,6 +955,7 @@
     };
 
     presenter.NavigationManager.prototype.goRight = function () {
+        this.nextPrevBtnWasClicked = true;
         var page = presenter.sections.getNextPageToCurrent();
 
         if (page) {
@@ -761,6 +964,7 @@
     };
 
     presenter.NavigationManager.prototype.goLeft = function () {
+        this.nextPrevBtnWasClicked = true;
         var page = presenter.sections.getPreviousPageToCurrent();
 
         if (page) {
@@ -817,6 +1021,7 @@
         this.$sections = $('&lt;div&gt;&lt;/div&gt;');
 
         this.$sections.addClass("sections");
+        presenter.configuration.enableDropdownPagesList &amp;&amp; this.$sections.addClass("enable-dropdown");
 
         presenter.$wrapper.append(this.$sections);
     };
@@ -871,6 +1076,7 @@
         this.removeInactiveClassFromNavigationButtons();
         this.buttons = [];
         this.actualPages = [];
+        this.staticPages = [];
     };
 
     presenter.NavigationManager.prototype.removeInactiveClassFromNavigationButtons = function () {
@@ -890,7 +1096,7 @@
     presenter.NavigationManager.prototype.addRightHellip = function () {
         if (this.shouldAddRightHellip()) {
             this.rightHellip = this.getHellip($.fn.prepend.bind(this.$navigationButtonsLast), this.shiftPagesToRight.bind(this), presenter.CSS_CLASSES.TURN_FORWARD);
-            return 1
+            return 1;
         }
 
         return 0;
@@ -948,15 +1154,21 @@
     };
 
     presenter.NavigationManager.prototype.moveToCurrentPageLogic = function () {
-        for (var i = 0; i &lt; this.actualPages.length; i++) {
-            var page = this.actualPages[i];
+        var allPages = this.actualPages.concat(this.staticPages);
+        for (var i = 0; i &lt; allPages.length; i++) {
+            var page = allPages[i];
             if (page != undefined &amp;&amp; page.isActualPage != undefined &amp;&amp; page.isActualPage()) {
                 return;
             }
         }
 
-        this.rightHellip.execute();
-        this.moveToCurrentPage();
+        if (this.leftOffset === 1 &amp;&amp; presenter.configuration.useDynamicPagination) {
+            this.shiftPagesToRight(1);
+            this.moveToCurrentPage();
+        } else if (this.rightHellip) {
+            this.shiftPagesToRight();
+            this.moveToCurrentPage();
+        }
     };
 
     presenter.NavigationManager.prototype.removeHellips = function () {
@@ -966,36 +1178,52 @@
     };
 
     presenter.NavigationManager.prototype.shiftPagesToLeft = function () {
+        var staticPagesNumber = presenter.configuration.numberOfStaticPages;
         if (this.shiftCount === 1) {
             this.leftSideIndex = 0;
         } else {
-            if (presenter.configuration.numberOfButtons - 4 &gt; 0) {
-                this.leftSideIndex -=  (presenter.configuration.numberOfButtons - 4);
+            if (presenter.configuration.numberOfButtons - 4 - staticPagesNumber&gt; 0) {
+                this.leftSideIndex -=  (presenter.configuration.numberOfButtons - 4 - staticPagesNumber);
             } else {
                 this.leftSideIndex -= 1;
             }
         }
+        this.leftOffset = 0;
 
-        this.shiftCount--;
+        if (this.shiftCount &gt; 0) {
+            this.shiftCount--;
+        } else {
+            this.leftSideIndex = 0;
+        }
         this.setSections();
     };
 
-    presenter.NavigationManager.prototype.shiftPagesToRight = function () {
-        var shift;
+    presenter.NavigationManager.prototype.shiftPagesToRight = function (shift = 0) {
+        if (shift === 0) {
+            shift = this.getShiftToRight();
+            this.shiftCount++;
+        } else {
+            this.shiftCount = Math.floor((presenter.sections.getActualPageIndex() + 1) / (presenter.configuration.numberOfButtons - 4));
+        }
+
+        this.leftSideIndex += shift;
+        this.setSections();
+    };
+
+    presenter.NavigationManager.prototype.getShiftToRight = function () {
+        let shift;
         if (presenter.configuration.userButtonsNumber) {
             shift = (presenter.configuration.numberOfButtons - 2 - this.hellipsCount);
         } else {
             shift = this.getNormalRightShift();
         }
 
+        shift = shift - presenter.configuration.numberOfStaticPages;
         if (shift &lt;= 0) {
             shift = 1;
         }
 
-        this.leftSideIndex += shift;
-
-        this.shiftCount++;
-        this.setSections();
+        return shift;
     };
 
     presenter.NavigationManager.prototype.getNormalRightShift = function () {
@@ -1008,15 +1236,38 @@
 
     presenter.NavigationManager.prototype.setSectionWidth = function ($section) {
         var numOfButtons = $section.find(".buttons").children().length;
-        $section.css({
-            width: (numOfButtons*presenter.configuration.sizes.elementWidth) + "px"
-        });
+
+        if (presenter.configuration.enableDropdownPagesList) {
+            const elementWidth = `${presenter.configuration.sizes.elementWidth}px`;
+            $section.css({ 'min-width': elementWidth });
+        } else {
+            const elementWidth = `${numOfButtons * presenter.configuration.sizes.elementWidth}px`;
+            $section.css({ 'width': elementWidth });
+        }
     };
 
     presenter.NavigationManager.prototype.setButtonCurrentPage = function (button, page) {
         if (page.isActualPage()) {
             button.setAsCurrent();
+            const _self = this;
+            setTimeout(function () {
+                _self.updateVisiblePages(button);
+            }, 0);
+         }
+    };
+
+    presenter.NavigationManager.prototype.updateVisiblePages = function (button) {
+        if (presenter.configuration.useDynamicPagination &amp;&amp; this.leftOffset === 1 &amp;&amp; this.isLastVisibleElement(button)) {
+            this.shiftPagesToRight(1);
         }
+    };
+
+    presenter.NavigationManager.prototype.isLastVisibleElement = function (button) {
+        const lastVisiblePage = this.actualPages[(this.actualPages.length - 1)].description;
+        const lastPageIndex = presenter.sections.allPages.slice(-1).page;
+        const isForwardButton = presenter.$wrapper.find("." + presenter.CSS_CLASSES.TURN_FORWARD).length &gt; 0;
+
+        return lastVisiblePage === button.description &amp;&amp; button.navigateToPage !== lastPageIndex &amp;&amp; isForwardButton;
     };
 
     presenter.NavigationManager.prototype.setButtonBookmark = function (button, page) {
@@ -1034,12 +1285,13 @@
     };
 
     presenter.NavigationManager.prototype.addSections = function (numberOfPages) {
-        this.actualPages = presenter.sections.getPages(this.leftSideIndex, numberOfPages);
+        this.staticPages = presenter.sections.getStaticPages();
+        this.actualPages = presenter.sections.getPages(this.leftSideIndex, numberOfPages - this.staticPages.length);
         var sectionIterator = -1;
 
         var len = this.actualPages.length;
         for (var i = 0; i &lt; len; i++) {
-            var button = this.getPageButton(this.actualPages[i]);
+            var button = this.getPageButton(this.actualPages[i], true);
             this.setButtonProperties(button, this.actualPages[i]);
             this.buttons.push(button);
 
@@ -1047,6 +1299,7 @@
         }
 
         this.appendSectionsToView();
+        this.appendStaticPages(this.staticPages);
         this.deactivateNavigationButtons();
     };
 
@@ -1057,8 +1310,43 @@
         }, this);
     };
 
-    presenter.NavigationManager.prototype.getPageButton = function (page) {
-        var button = new presenter.Button(page.description, page.buttonCssClassNames);
+    presenter.NavigationManager.prototype.appendStaticPages = function (pages) {
+        presenter.$view.find('.navigation-buttons-first .section').remove();
+        presenter.$view.find('.navigation-buttons-last .section').remove();
+        var staticSections = [];
+        for (var i = pages.length - 1; i &gt; -1; i--) {
+            var page = pages[i];
+            var sectionName = page.getSectionName();
+            var $section = null;
+            if (staticSections.indexOf(sectionName) == -1) {
+                $section = this.getSection(sectionName, page.getSectionClassName());
+                staticSections[sectionName] = $section;
+                if (page.staticPosition == 'left') {
+                    presenter.$view.find('.navigation-buttons-first .previous').after($section);
+                } else {
+                    if (presenter.$view.find('.navigation-buttons-last .section').length == 0) {
+                        presenter.$view.find('.navigation-buttons-last .next').before($section);
+                    } else {
+                        presenter.$view.find('.navigation-buttons-last .section').first().before($section);
+                    }
+                }
+            } else {
+                $section = staticSections[sectionName];
+            }
+
+
+            var button = this.getPageButton(page);
+            this.setButtonProperties(button, pages[i]);
+            $section.find('.buttons').append(button.getView());
+        };
+        if (pages.length &gt; 0) {
+            presenter.$view.find('.navigation-buttons-first &gt; div').css('float', 'left');
+            presenter.$view.find('.navigation-buttons-last &gt; div').css('float', 'left');
+        }
+    }
+
+    presenter.NavigationManager.prototype.getPageButton = function (page, isPageButton = false) {
+        var button = new presenter.Button(page.description, page.buttonCssClassNames, isPageButton);
         button.setCommand(page.getChangeToPageCommand());
         button.setNavigateToPage(page.page);
 
@@ -1096,17 +1384,31 @@
         $sectionName.text(sectionName);
         $sectionName.addClass(presenter.CSS_CLASSES.SECTION_NAME);
 
+        if (presenter.configuration.enableDropdownPagesList) {
+            $section.addClass("expandable-section");
+            presenter.addClickListener($section, cssClass);
+        }
+
         var $sectionButtons = $('&lt;div&gt;&lt;/div&gt;');
         $sectionButtons.addClass("buttons");
+        if (presenter.configuration.enableDropdownPagesList) {
+            const elementWidth = `${presenter.configuration.sizes.elementWidth}px`;
+            $sectionButtons.addClass("dropdown-list");
+            $sectionButtons.css('min-width', elementWidth);
+        }
 
         $section.append($sectionName);
         $section.append($sectionButtons);
+
+        if (presenter.configuration.enableDropdownPagesList &amp;&amp; !sectionName) {
+            $section.css('display', 'none');
+        }
 
         return $section;
     };
 
     presenter.NavigationManager.prototype.shouldAddLeftHellip = function () {
-        return this.leftSideIndex !== 0;
+        return this.leftSideIndex &gt; 0;
     };
 
     presenter.NavigationManager.prototype.shouldAddRightHellip = function () {
@@ -1118,6 +1420,158 @@
         }
         return this.leftSideIndex + buttonsWithoutNavigation - this.hellipsCount &lt; presenter.configuration.numberOfPages;
     };
+
+    presenter.addClickListener = function ($section, sectionClassName) {
+        $section.on('click', function (event) {
+            if (presenter.shouldRedirectToPage(sectionClassName)) {
+                presenter.handleRedirectToPage(sectionClassName);
+                return;
+            }
+            const isPageListVisible = presenter.isPageListOpen(sectionClassName);
+            presenter.hideVisiblePageList();
+
+            if (!isPageListVisible) {
+                presenter.changePageListVisibility(sectionClassName);
+            }
+            event.preventDefault();
+            event.stopPropagation();
+            
+            presenter.scrollToSelectedChapter();
+        });
+    };
+
+    presenter.shouldRedirectToPage = function (sectionClassName) {
+        const pageNumberInSection = $(`.${sectionClassName}`).find('.buttons.dropdown-list').children().length;
+
+        return presenter.configuration.enableRedirectToPage &amp;&amp; pageNumberInSection === 1;
+    }
+
+    presenter.handleRedirectToPage = function (sectionClassName) {
+        const selectedSection = presenter.getSelectedSection(sectionClassName);
+        const pageIndex = selectedSection[0].pages[0].page;
+
+        presenter.changeToPage(pageIndex);
+    }
+
+    presenter.getSelectedSection = function (sectionClassName) {
+        return presenter.sections.sections.filter(section =&gt; section.cssClassName === sectionClassName);
+    }
+
+    presenter.changePageListVisibility = function (sectionClassName) {
+        const $parentElement = $(`.${sectionClassName}`);
+        const $buttonsContainer = $parentElement.find('.buttons');
+        const isNotVisible = $buttonsContainer.css('display') === 'none';
+
+        if (isNotVisible) {
+            presenter.showPageListContainer($buttonsContainer, $parentElement);
+            presenter.currentSelectedChapterName = sectionClassName;
+            presenter.changeSectionsBarHeight(false);
+        } else {
+            presenter.hidePageListContainer($parentElement);
+            presenter.changeSectionsBarHeight(true);
+        }
+
+        presenter.handleSettingCurrentSectionClass();
+    };
+
+    presenter.isPageListOpen = function (sectionClassName) {
+        return $(`.${sectionClassName}`).hasClass(presenter.CSS_CLASSES.SELECTED);
+    }
+
+    presenter.showPageListContainer = function ($buttonsContainer, $parentElement) {
+        $buttonsContainer.css('display', 'flex');
+        $buttonsContainer.addClass(presenter.CSS_CLASSES.VISIBLE_PAGE_LIST);
+        $parentElement.addClass(presenter.CSS_CLASSES.SELECTED);
+    }
+
+    presenter.hidePageListContainer = function ($parentElement) {
+        const buttonsContainer = $(`.${presenter.CSS_CLASSES.VISIBLE_PAGE_LIST}`);
+
+        buttonsContainer.removeClass(presenter.CSS_CLASSES.VISIBLE_PAGE_LIST);
+        buttonsContainer.css('display', 'none');
+        $parentElement.removeClass(presenter.CSS_CLASSES.SELECTED);
+    }
+
+    presenter.hideVisiblePageList = function () {
+        if (!presenter.currentSelectedChapterName) {
+            return;
+        }
+
+        const pageListContainer = $(`.${presenter.CSS_CLASSES.VISIBLE_PAGE_LIST}`);
+        const $parentElement = $(`.${presenter.currentSelectedChapterName}`);
+
+        if (pageListContainer) {
+            $parentElement.removeClass(presenter.CSS_CLASSES.SELECTED);
+            pageListContainer.removeClass(presenter.CSS_CLASSES.VISIBLE_PAGE_LIST);
+            pageListContainer.css('display', 'none');
+        }
+
+        presenter.changeSectionsBarHeight(true);
+    }
+    
+    presenter.scrollToSelectedChapter = function () {
+        if (!presenter.isMobile()) {
+            return;
+        }
+
+        $('.addon_Assessments_Navigation_Bar').get(0).scrollLeft = presenter.getLeftScroll();
+    }
+    
+    presenter.isMobile = function () {
+        return MobileUtils.isMobileUserAgent(navigator.userAgent) || MobileUtils.isEventSupported('touchend');
+    }
+
+    presenter.getScale = function () {
+        const boundingWidth = $('#content').get(0).getBoundingClientRect().width;
+        const elementWidth = +$('#content').css('width').replace('px', '');
+
+        return boundingWidth / elementWidth;
+    }
+
+    presenter.getLeftScroll = function () {
+        const selectedChapterPosition = $('.expandable-section.selected').offset();
+        const currentScrollXBarPosition = $('.addon_Assessments_Navigation_Bar').get(0).scrollLeft;
+        const scale = presenter.getScale();
+        const offset = 20;
+        const scrollLeft = (selectedChapterPosition.left / scale) + currentScrollXBarPosition - offset;
+
+        return scrollLeft &lt; 0 ? 0 : scrollLeft;
+    }
+
+    presenter.changeSectionsBarHeight = function (setDefaultValue) {
+        if (!presenter.isMobile()) {
+            return;
+        }
+
+        const $addonElement = $('.addon_Assessments_Navigation_Bar');
+
+        if (setDefaultValue) {
+            $addonElement.css('height', presenter.previousSectionsBarHeight)
+        } else {
+            presenter.previousSectionsBarHeight = +$addonElement.css('height').replace('px', '');
+            const pagesListHeight = +$(`.${presenter.CSS_CLASSES.VISIBLE_PAGE_LIST}`).css('height').replace('px', '');
+            const totalHeight = presenter.previousSectionsBarHeight + pagesListHeight;
+            $addonElement.css('height', totalHeight)
+        }
+    }
+
+    presenter.handleSettingCurrentSectionClass = function () {
+        const $element = $(`.${presenter.CSS_CLASSES.CURRENT_SECTION}`);
+        if ($element) {
+            $element.removeClass(presenter.CSS_CLASSES.CURRENT_SECTION);
+        }
+
+        presenter.addClassToCurrentSection();
+    }
+
+    presenter.addClassToCurrentSection = function () {
+        const $element = $('.button.element.current_page');
+        const $sectionElement = $element?.parent().parent();
+
+        if ($sectionElement) {
+            $sectionElement.addClass(presenter.CSS_CLASSES.CURRENT_SECTION);
+        }
+    }
 
     presenter.run = function(view, model){
         presenter.isPreview = false;
@@ -1139,6 +1593,10 @@
         var upgradedModel = presenter.upgradeNumberAndWidthOfButtons(model);
         upgradedModel = presenter.upgradeDefaultOrder(upgradedModel);
         upgradedModel = presenter.upgradeLangTag(upgradedModel);
+        upgradedModel = presenter.upgradeUseDynamicPagination(upgradedModel);
+        upgradedModel = presenter.upgradeEnableDropdownPagesList(upgradedModel);
+        upgradedModel = presenter.upgradeEnableRedirectToPage(upgradedModel);
+
         return presenter.upgradeSpeechTexts(upgradedModel);
     };
 
@@ -1196,6 +1654,39 @@
 
         return upgradedModel;
     };
+
+    presenter.upgradeUseDynamicPagination = function (model) {
+        var upgradedModel = {};
+        jQuery.extend(true, upgradedModel, model); // Deep copy of model object
+
+        if (!model.hasOwnProperty('useDynamicPagination')) {
+            upgradedModel['useDynamicPagination'] = 'False';
+        }
+
+        return upgradedModel;
+    }
+
+    presenter.upgradeEnableDropdownPagesList = function (model) {
+        var upgradedModel = {};
+        jQuery.extend(true, upgradedModel, model); // Deep copy of model object
+
+        if (!model.hasOwnProperty('enableDropdownPagesList')) {
+            upgradedModel['enableDropdownPagesList'] = 'False';
+        }
+
+        return upgradedModel;
+    }
+
+    presenter.upgradeEnableRedirectToPage = function (model) {
+        var upgradedModel = {};
+        jQuery.extend(true, upgradedModel, model); // Deep copy of model object
+
+        if (!model.hasOwnProperty('enableRedirectToPage')) {
+            upgradedModel['enableRedirectToPage'] = 'False';
+        }
+
+        return upgradedModel;
+    }
 
     presenter.setSpeechTexts = function(speechTexts) {
         presenter.speechTexts = {
@@ -1268,12 +1759,17 @@
         presenter.initializeAddon();
 
         if (presenter.isPreview) {
-            presenter.navigationManager.buttons[0].setAsCurrent();
+            if (presenter.navigationManager.buttons.length &gt; 0) {
+                presenter.navigationManager.buttons[0].setAsCurrent();
+            }
         } else {
             presenter.navigationManager.moveToCurrentPage();
         }
 
         presenter.buildKeyboardController();
+        presenter.addHidingPageListListener();
+        presenter.addEnabledPageListClass();
+        presenter.handleSettingCurrentSectionClass();
     };
 
     function removeMockupDOM () {
@@ -1352,6 +1848,16 @@
         }, 0);
     };
 
+    presenter.calculateNumberOfStaticPages = function (sections) {
+        var staticSections = [];
+        for (var i = 0; i &lt; sections.length; i++) {
+            if (sections[i].staticPosition.length &gt; 0) {
+                staticSections.push(sections[i]);
+            }
+        }
+        return presenter.calculateNumberOfPages(staticSections);
+    }
+
     presenter.validateModel = function (model) {
         var validatedSections = presenter.validateSections(model["Sections"]);
 
@@ -1360,6 +1866,7 @@
         }
 
         var numberOfPages = presenter.calculateNumberOfPages(validatedSections.sections);
+        var numberOfStaticPages = presenter.calculateNumberOfStaticPages(validatedSections.sections);
 
         var validateButtonsNumber = presenter.parseButtonsNumber(model["userButtonsNumber"], numberOfPages);
         if (!validateButtonsNumber.isValid) {
@@ -1379,7 +1886,11 @@
             defaultOrder: ModelValidationUtils.validateBoolean(model["defaultOrder"]),
             userButtonsNumber: validateButtonsNumber.value,
             userButtonsWidth: validateButtonsWidth.value,
-            numberOfPages: numberOfPages
+            numberOfPages: numberOfPages,
+            numberOfStaticPages: numberOfStaticPages,
+            useDynamicPagination: ModelValidationUtils.validateBoolean(model["useDynamicPagination"]),
+            enableDropdownPagesList: ModelValidationUtils.validateBoolean(model["enableDropdownPagesList"]),
+            enableRedirectToPage: ModelValidationUtils.validateBoolean(model["enableRedirectToPage"]),
         };
     };
 
@@ -1563,6 +2074,7 @@
         var sectionName = "";
         var descriptions = [];
         var sectionButtonsCssClassNames = {cssClasses: []};
+        var staticPosition = '';
 
         var pages = presenter.parsePagesFromRange(section[0], (sectionIndex + 1));
 
@@ -1586,9 +2098,20 @@
         }
 
         if (len &gt; 3) {
-            sectionButtonsCssClassNames = presenter.parseSectionButtonsCssClassNames(section[3], (sectionIndex + 1));
-            if (!sectionButtonsCssClassNames.isValid) {
-                return sectionButtonsCssClassNames;
+            if (len &lt;= 4 || getTrimmedStringElement(section[3]).length != 0) {
+                sectionButtonsCssClassNames = presenter.parseSectionButtonsCssClassNames(section[3], (sectionIndex + 1));
+                if (!sectionButtonsCssClassNames.isValid) {
+                    return sectionButtonsCssClassNames;
+                }
+            }
+        }
+
+        if (len &gt; 4) {
+            var rawPosition = getTrimmedStringElement(section[4]).toLowerCase();
+            if (rawPosition == 'left') staticPosition = 'left';
+            if (rawPosition == 'right') staticPosition = 'right';
+            if (rawPosition.length &gt; 0 &amp;&amp; staticPosition.length == 0) {
+                return getErrorObject("S_13", {section: sectionIndex});
             }
         }
 
@@ -1598,6 +2121,7 @@
             sectionName: sectionName,
             pagesDescriptions: descriptions.descriptions,
             sectionButtonsCssClassNames: sectionButtonsCssClassNames.cssClasses,
+            staticPosition: staticPosition
         }
     }
 
@@ -1673,6 +2197,9 @@
     };
 
     presenter.getState = function(){
+        if (presenter.sections.allPages == null
+        || presenter.sections.allPages.length ==0
+        || presenter.navigationManager.actualPages.length == 0) return "";
         var pages = presenter.sections.allPages.map(function (page) {
             return {
                 page: page.page,
@@ -1680,15 +2207,18 @@
                 sectionName: page.sectionName,
                 sectionCssClass: page.sectionCssClass,
                 buttonCssClassNames: page.buttonCssClassNames,
-                isBookmarkOn: page.isBookmarkOn
+                isBookmarkOn: page.isBookmarkOn,
+                staticPosition: page.staticPosition,
             };
         });
 
         var state = {
             pages: pages,
-            attemptedPages: presenter.sections.attemptedPages
+            attemptedPages: presenter.sections.attemptedPages,
+            leftSideIndex: presenter.navigationManager.getLeftSideIndex(),
+            leftSideValue: presenter.navigationManager.actualPages[0].page,
+            nextPrevBtnWasClicked: presenter.navigationManager.nextPrevBtnWasClicked
         };
-
         return JSON.stringify(state);
     };
 
@@ -1696,7 +2226,8 @@
         var restoredPages = pages.map(function (page) {
             var restoredPage = new presenter.Page(
                 page.page, page.description, page.sectionName,
-                page.sectionCssClass, page.buttonCssClassNames
+                page.sectionCssClass, page.buttonCssClassNames,
+                page.staticPosition
             );
             restoredPage.setBookmarkOn(page.isBookmarkOn);
 
@@ -1717,7 +2248,7 @@
         }
     }
 
-    presenter.setState = function(state){
+    presenter.setState = function (state) {
         if (state === null || state === "" || state === undefined) {
             return;
         }
@@ -1729,32 +2260,59 @@
 
         var parsedState = JSON.parse(state);
         var upgradedState = presenter.upgradeState(parsedState);
+        const previousLeftSideIndex = parsedState.leftSideIndex;
+        const previousLeftSideValue = parsedState.leftSideValue;
+        const nextPrevBtnWasClicked = parsedState.nextPrevBtnWasClicked;
 
         var restoredPages = getRestorePagesObjectArray(upgradedState.pages);
         // This if fix on wrong state when filter of sections worked wrong
         presenter.sections.allPages = restoredPages.length === presenter.sections.allPages.length ? restoredPages : presenter.sections.allPages;
+        presenter.navigationManager.calculateLeftOffset(previousLeftSideValue, nextPrevBtnWasClicked);
         presenter.navigationManager.restartLeftSideIndex();
+        presenter.navigationManager.setLeftSideIndex(previousLeftSideIndex, previousLeftSideValue);
         presenter.navigationManager.setSections();
         presenter.navigationManager.moveToCurrentPage();
-
-        if (presenter.keyboardControllerObject != null) {
-            presenter.keyboardControllerObject.setElements(presenter.getElementsForKeyboardNavigation());
-
-            var keyboardElements = presenter.keyboardControllerObject.keyboardNavigationElements;
-            for (var i = 0; i &lt; keyboardElements.length; i++) {
-                if ($(keyboardElements[i]).hasClass(presenter.CSS_CLASSES.CURRENT_PAGE)) {
-                    presenter.keyboardControllerObject.keyboardNavigationCurrentElementIndex = i;
-                }
-            }
-        }
+        presenter.handleSettingCurrentSectionClass();
 
         presenter.sections.attemptedPages = upgradedState.attemptedPages;
         presenter.navigationManager.markButtonsWithAttempted(presenter.sections.attemptedPages);
+
+        if (presenter.keyboardControllerObject != null) {
+            if (presenter.configuration.enableDropdownPagesList) {
+                presenter.keyboardControllerObject.setElements(presenter.getElementsForTTS());
+                presenter.markCurrentSection();
+            } else {
+                presenter.keyboardControllerObject.setElements(presenter.getElementsForKeyboardNavigation());
+                presenter.markCurrentObject();
+            }
+        }
     };
+
+    presenter.markCurrentObject = function () {
+        const keyboardElements = presenter.keyboardControllerObject.keyboardNavigationElements;
+
+        for (var i = 0; i &lt; keyboardElements.length; i++) {
+            if ($(keyboardElements[i]).hasClass(presenter.CSS_CLASSES.CURRENT_PAGE)) {
+                presenter.keyboardControllerObject.keyboardNavigationCurrentElementIndex = i;
+            }
+        }
+    }
+
+    presenter.markCurrentSection = function () {
+        const keyboardElements = presenter.keyboardControllerObject.keyboardNavigationElements;
+
+        for (var i = 0; i &lt; keyboardElements.length; i++) {
+            const parentElement = $(keyboardElements[i]).parent();
+            if ((parentElement).hasClass(presenter.CSS_CLASSES.CURRENT_SECTION)) {
+                presenter.keyboardControllerObject.keyboardNavigationCurrentElementIndex = i;
+            }
+        }
+    }
 
     presenter.upgradeState = function (state) {
         var upgradedState = presenter.upgradeAttemptedPages(state);
-        return presenter.upgradePagesButtonCssClassNames(upgradedState);
+        upgradedState = presenter.upgradePagesButtonCssClassNames(upgradedState);
+        return presenter.upgradePagesStaticPosition(upgradedState);
     };
 
     presenter.upgradeAttemptedPages = function (state) {
@@ -1776,6 +2334,21 @@
             upgradedState.pages.map(function (page) {
                 if(page.buttonCssClassNames === undefined) {
                     page["buttonCssClassNames"] = [];
+                }
+            });
+        }
+
+        return upgradedState;
+    };
+
+    presenter.upgradePagesStaticPosition = function (state) {
+        var upgradedState = {};
+        jQuery.extend(true, upgradedState, state); // Deep copy of model object
+
+        if (upgradedState.pages) {
+            upgradedState.pages.map(function (page) {
+                if(page.staticPosition === undefined) {
+                    page["staticPosition"] = '';
                 }
             });
         }
@@ -1901,26 +2474,101 @@
             KeyboardController.prototype.markCurrentElement.call(this, new_position_index);
         }
         this.readCurrentElement();
+
+        if (!presenter.isPageListNavigationActive) {
+            presenter.currentSelectedChapterIndex = this.keyboardNavigationCurrentElementIndex;
+        }
     };
 
     AssesmentsNavigationKeyboardController.prototype.enter = function (event) {
         if (presenter.isTTS() &amp;&amp; presenter.isFirstEnter) {
             KeyboardController.prototype.setElements.call(this, presenter.getElementsForTTS());
             presenter.isFirstEnter = false;
+            presenter.currentSelectedChapterIndex = 0;
         }
         KeyboardController.prototype.enter.call(this, event);
         this.readCurrentElement();
     };
 
+    AssesmentsNavigationKeyboardController.prototype.select = function (event) {
+        const selectedSectionClassName = $('.keyboard_navigation_active_element').parent().get(0).classList[0];
+        const isSectionSelected = $(this.keyboardNavigationCurrentElement).hasClass('section_name');
+        const isExpendable = presenter.configuration.enableDropdownPagesList &amp;&amp; isSectionSelected;
+
+        if (isExpendable &amp;&amp; presenter.shouldRedirectToPage(selectedSectionClassName)) {
+            presenter.handleRedirectToPage(selectedSectionClassName);
+        } else if (isExpendable) {
+            presenter.isPageListNavigationActive = true;
+            presenter.changePageListVisibility(selectedSectionClassName);
+            KeyboardController.prototype.setElements.call(this, presenter.getPageListElementsForTTS());
+            presenter.keyboardControllerObject.keyboardNavigationCurrentElementIndex = 0;
+            KeyboardController.prototype.markCurrentElement.call(this, 0);
+        } else {
+            KeyboardController.prototype.select.call(this, event);
+        }
+    }
+
+    presenter.getButtonElement = function (sectionClassName) {
+        const $parentElement = $(`.${sectionClassName}`);
+        const $buttonsContainer = $parentElement.find('.buttons');
+
+        return $buttonsContainer.get(0).firstChild;
+    }
+
+    presenter.changePageListVisibilityStatus = function () {
+        setTimeout(function() {
+            presenter.isPageListNavigationActive = false;
+        }, 1000);
+    }
+
+    AssesmentsNavigationKeyboardController.prototype.escape = function (event) {
+        if (presenter.configuration.enableDropdownPagesList &amp;&amp; presenter.isPageListNavigationActive) {
+            const selectedSectionClassName = $('.keyboard_navigation_active_element').parent().get(0).classList[0];
+            presenter.changePageListVisibility(selectedSectionClassName);
+            KeyboardController.prototype.setElements.call(this, presenter.getElementsForTTS());
+            presenter.changePageListVisibilityStatus();
+            presenter.keyboardControllerObject.switchElement(presenter.currentSelectedChapterIndex);
+        } else {
+            KeyboardController.prototype.escape.call(this, event);
+        }
+    }
+
     AssesmentsNavigationKeyboardController.prototype.exitWCAGMode = function () {
+        if (presenter.isPageListNavigationActive) {
+            const selectedSectionClassName = $('.keyboard_navigation_active_element').parent().get(0).classList[0];
+            presenter.changePageListVisibility(selectedSectionClassName);
+        }
         presenter.isFirstEnter = true;
         KeyboardController.prototype.setElements.call(this, presenter.getElementsForKeyboardNavigation());
         KeyboardController.prototype.exitWCAGMode.call(this);
     };
 
+    presenter.isDeactivationBlocked = function() {
+        return presenter.isPageListNavigationActive;
+    };
+
     presenter.buildKeyboardController = function () {
         presenter.keyboardControllerObject = new AssesmentsNavigationKeyboardController(presenter.getElementsForKeyboardNavigation(), 1);
     };
+
+    presenter.addHidingPageListListener = function () {
+        const $header = $('.ic_header');
+        const $body = $('.ic_page');
+
+        $header.on('click', function () {
+            presenter.hideVisiblePageList();
+        })
+
+        $body.on('click', function () {
+            presenter.hideVisiblePageList();
+        })
+    }
+
+    presenter.addEnabledPageListClass = function () {
+        if (presenter.configuration.enableDropdownPagesList) {
+            this.$view.addClass(presenter.CSS_CLASSES.ENABLED_PAGE_LIST);
+        }
+    }
 
     presenter.getElementsForTTS = function () {
         return this.$view.find(".element:visible, .section_name:visible").filter(":not(.inactive)");
@@ -1929,6 +2577,11 @@
     presenter.getElementsForKeyboardNavigation = function () {
         return this.$view.find(".element:visible").filter(":not(.inactive)");
     };
+
+    presenter.getPageListElementsForTTS = function () {
+        const childrenWrapper = $('.keyboard_navigation_active_element').parent().get(0).children[1];
+        return $(childrenWrapper).find('.element');
+    }
 
     presenter.keyboardController = function(keycode, isShiftKeyDown, event) {
         presenter.keyboardControllerObject.handle(keycode, isShiftKeyDown, event)

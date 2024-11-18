@@ -475,10 +475,14 @@
         var wrapper = $('&lt;div class="game-won-message-wrapper"&gt;&lt;/div&gt;');
         var message = $(`&lt;div class="${CSS_CLASSES.GAME_WON_MESSAGE}"&gt;&lt;/div&gt;`);
         if(presenter.config.showSummary) {
-            message.html(presenter.config.gameWonMessage +
-                '&lt;div&gt;' + presenter.config.gameSummaryMessage + '&lt;div&gt;' + presenter.config.correctGameMessage + ': ' + getScore() + '&lt;/div&gt;&lt;div&gt;' + presenter.config.wrongGameMessage + ': ' + (presenter.config.questions.length - getScore()) + '&lt;/div&gt;' + '&lt;/div&gt;');
-        }else{
-            message.html(presenter.config.gameWonMessage);
+            message.html(window.xssUtils.sanitize(
+                parseAltText(presenter.config.gameWonMessage) +
+                '&lt;div&gt;' + parseAltText(presenter.config.gameSummaryMessage) +
+                '&lt;div&gt;' + parseAltText(presenter.config.correctGameMessage) + ': ' + getScore() +
+                '&lt;/div&gt;&lt;div&gt;' + parseAltText(presenter.config.wrongGameMessage) + ': ' + (presenter.config.questions.length - getScore()) +
+                '&lt;/div&gt;' + '&lt;/div&gt;'));
+        } else {
+            message.html(window.xssUtils.sanitize(parseAltText(presenter.config.gameWonMessage)));
         }
         wrapper.append(message);
         showInHintArea(wrapper);
@@ -488,22 +492,22 @@
         var wrapper = $('&lt;div class="game-lost-message-wrapper"&gt;&lt;/div&gt;');
         var message = $(`&lt;div class="${CSS_CLASSES.GAME_LOST_MESSAGE}"&gt;&lt;/div&gt;`);
         if(presenter.config.showSummary) {
-            message.html(presenter.config.gameLostMessage +
-                '&lt;div&gt;' + presenter.config.gameSummaryMessage + '&lt;div&gt;' + presenter.config.correctGameMessage + ': ' + getScore() + '&lt;/div&gt;&lt;div&gt;' + presenter.config.wrongGameMessage + ': ' + (presenter.config.questions.length - getScore()) + '&lt;/div&gt;' + '&lt;/div&gt;');
+            message.html(window.xssUtils.sanitize(
+                parseAltText(presenter.config.gameLostMessage) +
+                '&lt;div&gt;' + parseAltText(presenter.config.gameSummaryMessage) +
+                '&lt;div&gt;' + parseAltText(presenter.config.correctGameMessage) + ': ' + getScore() +
+                '&lt;/div&gt;&lt;div&gt;' + parseAltText(presenter.config.wrongGameMessage) + ': ' + (presenter.config.questions.length - getScore()) +
+                '&lt;/div&gt;' + '&lt;/div&gt;'));
         }else{
-            message.html(presenter.config.gameLostMessage);
+            message.html(window.xssUtils.sanitize(parseAltText(presenter.config.gameLostMessage)));
         }
         wrapper.append(message);
         showInHintArea(wrapper);
     };
 
-    function gameSummary() {
-        var wrapper = $('&lt;div class="game-summary-message-wrapper"&gt;&lt;/div&gt;');
-        var message = $('&lt;div class="game-summary-message"&gt;&lt;/div&gt;');
-        message.html(presenter.config.gameSummaryMessage + '&lt;div&gt;' + presenter.config.correctGameMessage + ': ' + getScore() + '&lt;/div&gt;&lt;div&gt;' + presenter.config.wrongGameMessage + ': ' + (presenter.config.questions.length - getScore()) + '&lt;/div&gt;');
-        wrapper.append(message);
-        showInHintArea(wrapper);
-    };
+    function parseAltText(text) {
+        return presenter.preview ? window.TTSUtils.parsePreviewAltText(text) : presenter.textParser.parse(text);
+    }
 
     function getSelectItemAction(answer, $this) {
         var isCorrect = answer == getCurrentQuestion().CorrectAnswer;
@@ -655,7 +659,8 @@
     };
 
     function showHint() {
-        var $hint = $(`&lt;div class="${CSS_CLASSES.QUESTION_HINT}"&gt;&lt;/div&gt;`).html(getCurrentQuestion().Hint);
+        var $hint = $(`&lt;div class="${CSS_CLASSES.QUESTION_HINT}"&gt;&lt;/div&gt;`);
+        $hint.html(window.xssUtils.sanitize(parseAltText(getCurrentQuestion().Hint)));
         showInHintArea($hint);
         presenter.$view.find('.hint-button').addClass('used');
     }
@@ -705,13 +710,12 @@
         var $title = $(`&lt;div class="${CSS_CLASSES.QUESTION_TITLE}"&gt;&lt;/div&gt;`);
         var $tips = $('&lt;div class="question-tips"&gt;&lt;/div&gt;');
         var $nextButton = $(`&lt;div class="${CSS_CLASSES.NEXT_QUESTION_BUTTON}"&gt;&lt;/div&gt;`);
-        $nextButton.text(presenter.config.nextLabel);
+        $nextButton.html(window.xssUtils.sanitize(parseAltText(presenter.config.nextLabel)));
         $nextButton.clickAction = nextButtonAction;
-
 
         cleanWorkspace();
 
-        $title.html(q.Question);
+        $title.html(window.xssUtils.sanitize(parseAltText(q.Question)));
 
         var tempAnswers = [q.CorrectAnswer];
         [q.WrongAnswer1, q.WrongAnswer2, q.WrongAnswer3].forEach(function (wrongAnswer) {
@@ -755,7 +759,7 @@
 
             var label = labels[i];
             $headersOfAnswer.text(label);
-            $divAnswers.text(answer || '');
+            $divAnswers.html(window.xssUtils.sanitize(parseAltText(answer || '')));
             if (answer === null) {
                 $tip.addClass(CSS_CLASSES.REMOVED);
                 $tip.clickAction = function () {
@@ -859,6 +863,7 @@
     function initializeLogic(view, model, preview) {
         setupDefaults();
         presenter.$view = $(view);
+        presenter.preview = preview;
         try {
             presenter.setupConfig(model);
             presenter.showCurrentQuestion();
@@ -898,6 +903,8 @@
 
     presenter.setPlayerController = function AddonQuiz_setPlayerController(controller) {
         playerController = controller;
+
+        presenter.textParser = new TextParserProxy(controller.getTextParser());
     };
 
     presenter.setVisibility = function AddonQuiz_setVisibility(isVisible) {
@@ -916,6 +923,7 @@
     presenter.run = function AddonQuiz_run(view, model) {
         eventBus = playerController.getEventBus();
         presenter.addonID = model.ID;
+        presenter.view = view
         var upgradedModel = presenter.upgradeModel(model);
         initializeLogic(view, upgradedModel, false);
         presenter.setVisibility(presenter.config.isVisible);
@@ -923,11 +931,8 @@
         eventBus.addEventListener('ShowAnswers', this);
         eventBus.addEventListener('HideAnswers', this);
 
-        presenter.$view[0].addEventListener('DOMNodeRemoved', function onDOMNodeRemoved(ev) {
-            if (ev.target === this) {
-                presenter.destroy();
-            }
-        });
+        MutationObserverService.createDestroyObserver(presenter.addonID, presenter.destroy, presenter.view);
+        MutationObserverService.setObserver();
 
         presenter.isLoaded = true;
     };
@@ -1077,8 +1082,9 @@
         bindEvents();
     };
 
-    presenter.destroy = function () {
-        presenter.$view[0].removeEventListener('DOMNodeRemoved', presenter.destroy);
+    presenter.destroy = function (event) {
+        if (event.target !== presenter.view) { return; }
+
         unbindEvents();
         presenter.$view.off();
         presenter.eventBus = null;

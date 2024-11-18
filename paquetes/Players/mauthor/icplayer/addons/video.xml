@@ -12,7 +12,6 @@
 			<property name="time_labels" nameLabel="video_property_time_labels" type="text"/>
 			<property isLocalized="true" name="Audio Description" nameLabel="video_property_audiodescription" type="text"/>
 		</property>
-		<property name="Show video" nameLabel="video_property_show_video" type="string"/>
 		<property isLocalized="true" name="Narration" nameLabel="video_property_narration" type="narration"/>
         <property name="Hide default controls" nameLabel="video_property_hide_default_controls" type="boolean"/>
         <property name="Hide subtitles" nameLabel="video_property_hide_subtitles" type="boolean"/>
@@ -27,6 +26,8 @@
         </property>
         <property name="offlineMessage" nameLabel="video_property_offline_message" type="text"/>
 		<property name="enableVideoSpeedController" nameLabel="enable_video_speed_controller" type="boolean"/>
+		<property name="Base width" nameLabel="video_property_base_width" type="string"/>
+		<property name="Base height" nameLabel="video_property_base_height" type="string"/>
 	</model>
 <css>.video-container {
     background-color: #000;
@@ -342,6 +343,11 @@ function Addonvideo_create() {
         top: 0
     };
 
+    presenter.captionsScale = {
+        xScale: 1.0,
+        yScale: 1.0
+    };
+
     presenter.lastWidthAndHeightValues = {
         width: 0,
         height: 0
@@ -362,7 +368,11 @@ function Addonvideo_create() {
         files: [],
         height: 0,
         showPlayButton: false,
-        offlineMessage: ""
+        offlineMessage: "",
+        baseDimensions: {
+            width: 0,
+            height: 0
+        }
     };
 
     presenter.lastSentCurrentTime = 0;
@@ -416,7 +426,9 @@ function Addonvideo_create() {
         upgradedModel = presenter.upgradeSpeechTexts(upgradedModel);
         upgradedModel = presenter.upgradeOfflineMessage(upgradedModel);
         upgradedModel = presenter.upgradeVideoSpeedController(upgradedModel);
-        return presenter.upgradeShowPlayButton(upgradedModel);
+        upgradedModel = presenter.upgradeShowPlayButton(upgradedModel);
+        upgradedModel = presenter.upgradeBaseDimensions(upgradedModel);
+        return presenter.removeShowVideoFromModel(upgradedModel);
     };
 
     presenter.upgradePoster = function (model) {
@@ -474,6 +486,32 @@ function Addonvideo_create() {
         return upgradedModel;
     }
 
+    presenter.upgradeBaseDimensions = function(model) {
+        var upgradedModel = {};
+        $.extend(true, upgradedModel, model);
+
+        if (!upgradedModel.hasOwnProperty('Base width')) {
+            upgradedModel['Base width'] = '';
+        }
+
+        if (!upgradedModel.hasOwnProperty('Base height')) {
+            upgradedModel['Base height'] = '';
+        }
+
+        return upgradedModel;
+    }
+
+    presenter.removeShowVideoFromModel = function(model) {
+        const upgradedModel = {};
+        $.extend(true, upgradedModel, model);
+
+        if (upgradedModel.hasOwnProperty("Show video")) {
+            delete upgradedModel["Show video"];
+        }
+
+        return upgradedModel;
+    };
+
     presenter.callMetadataLoadedQueue = function () {
         for (var i = 0; i &lt; presenter.metadataQueue.length; i++) {
             var queueElement = presenter.metadataQueue[i];
@@ -488,7 +526,8 @@ function Addonvideo_create() {
         'MEDIA_ERR_DECODE': 2,
         'MEDIA_ERR_NETWORK': 3,
         'MEDIA_ERR_SRC_NOT_SUPPORTED': [4, 'Ups ! Looks like your browser doesn\'t support this codecs. Go &lt;a href="https://tools.google.com/dlpage/webmmf/" &gt; -here- &lt;/a&gt; to download WebM plugin'],
-        'NVT01': "Not valid data format in time labels property"
+        'NVT01': "Not valid data format in time labels property",
+        'NVD01': "Base width and height must be either positive integers or empty"
     };
 
     presenter.getVideoErrorMessage = function (errorCode) {
@@ -542,7 +581,9 @@ function Addonvideo_create() {
                 top: '0px'
             });
 
-            $(presenter.controlBar.getMainElement()).css('position', "fixed");
+            if (presenter.configuration.defaultControls) {
+                $(presenter.controlBar.getMainElement()).css('position', "fixed");
+            }
 
             presenter.$posterWrapper.hide();
 
@@ -558,7 +599,9 @@ function Addonvideo_create() {
                 position: 'relative'
             });
 
-            $(presenter.controlBar.getMainElement()).css('position', "absolute");
+            if (presenter.configuration.defaultControls) {
+                $(presenter.controlBar.getMainElement()).css('position', "absolute");
+            }
 
         }
 
@@ -597,11 +640,19 @@ function Addonvideo_create() {
 
     presenter.onEventReceived = function (eventName, eventData) {
         presenter.pageLoadedDeferred.resolve();
-        if (eventData.value === 'dropdownClicked' &amp;&amp; !presenter.videoObject.playing) {
+        if (eventData.value === 'dropdownClicked' &amp;&amp; !presenter.videoObject.playing &amp;&amp; !isTemporarilyPaused()) {
             presenter.metadadaLoaded = false;
             presenter.videoObject.load();
         }
     };
+
+    function isTemporarilyPaused() {
+        return (presenter.videoObject.paused
+            &amp;&amp; presenter.videoObject.readyState &gt; 2
+            &amp;&amp; presenter.videoObject.currentTime &gt; 0
+            &amp;&amp; !presenter.videoObject.ended
+        );
+    }
 
     presenter.createEndedEventData = function (currentVideo) {
         return {
@@ -648,7 +699,7 @@ function Addonvideo_create() {
         presenter.originalVideoSize = presenter.getVideoSize(presenter.configuration.addonSize, presenter.videoObject);
         presenter.calculateCaptionsOffset(presenter.configuration.addonSize, true);
 
-        if (presenter.controlBar !== null) {
+        if (presenter.configuration.defaultControls) {
             presenter.$view.find('.video-container').append(presenter.controlBar.getMainElement());
             presenter.controlBar.setMaxDurationTime(presenter.videoObject.duration);
             if (presenter.stylesBeforeFullscreen.actualTime !== -1) {
@@ -675,8 +726,8 @@ function Addonvideo_create() {
 
         if (changeWidth) {
             presenter.$captionsContainer.css({
-                width: videoSize.width,
-                height: videoSize.height
+                width: videoSize.width / presenter.captionsScale.xScale,
+                height: videoSize.height / presenter.captionsScale.yScale
             });
         }
     };
@@ -725,13 +776,12 @@ function Addonvideo_create() {
     presenter.destroy = function () {
         var view = document.getElementsByClassName('ic_page');
 
-        if (presenter.controlBar !== null) {
+        if (presenter.configuration.defaultControls) {
             presenter.controlBar.destroy();
         }
 
         presenter.stop();
 
-        presenter.videoView.removeEventListener('DOMNodeRemoved', presenter.destroy);
         presenter.videoObject.removeEventListener('click', presenter.stopPropagationOnClickEvent);
         presenter.videoObject.removeEventListener('loadedmetadata', presenter.setMetaDataOnMetaDataLoadedEvent);
         presenter.videoObject.removeEventListener('play', setVideoStateOnPlayEvent);
@@ -1141,6 +1191,29 @@ function Addonvideo_create() {
             return validatedFiles;
         }
 
+        var baseDimensions = {
+            width: 0,
+            height: 0
+        };
+        if (model['Base width'].trim().length !== 0) {
+            var validatedBaseWidth = ModelValidationUtils.validatePositiveInteger(model['Base width']);
+            if (validatedBaseWidth.isValid) {
+                baseDimensions.width = validatedBaseWidth.value;
+            } else {
+                validatedBaseWidth.errorCode = 'NVD01';
+                return validatedBaseWidth;
+            }
+        }
+        if (model['Base height'].trim().length !== 0) {
+            var validatedBaseHeight = ModelValidationUtils.validatePositiveInteger(model['Base height']);
+            if (validatedBaseHeight.isValid) {
+                baseDimensions.height = validatedBaseHeight.value;
+            } else {
+                validatedBaseHeight.errorCode = 'NVD01';
+                return validatedBaseHeight;
+            }
+        }
+
         return {
             isValid: true,
             addonSize: {
@@ -1156,7 +1229,8 @@ function Addonvideo_create() {
             showPlayButton: ModelValidationUtils.validateBoolean(model['Show play button']),
             isTabindexEnabled: ModelValidationUtils.validateBoolean(model["Is Tabindex Enabled"]),
             offlineMessage: model["offlineMessage"],
-            enableVideoSpeedController: ModelValidationUtils.validateBoolean(model["enableVideoSpeedController"])
+            enableVideoSpeedController: ModelValidationUtils.validateBoolean(model["enableVideoSpeedController"]),
+            baseDimensions: baseDimensions
         }
     };
 
@@ -1226,16 +1300,22 @@ function Addonvideo_create() {
     };
 
     presenter.addVideoSpeedController = function () {
-        if (presenter.configuration.enableVideoSpeedController) {
-            presenter.isVideoSpeedControllerAdded = true;
-            presenter.controlBar.addVideoSpeedController(presenter.setPlaybackRate);
+        if (!presenter.configuration.defaultControls || !presenter.configuration.enableVideoSpeedController) {
+            return;
         }
-    }
+
+        presenter.isVideoSpeedControllerAdded = true;
+        presenter.controlBar.addVideoSpeedController(presenter.setPlaybackRate);
+    };
 
     presenter.resetVideoSpeedController = function () {
+        if (!presenter.configuration.defaultControls || !presenter.configuration.enableVideoSpeedController) {
+            return;
+        }
+
         presenter.controlBar.resetPlaybackRateSelectValue();
         presenter.setPlaybackRate(1.0);
-    }
+    };
 
     presenter.run = function (view, model) {
         var upgradedModel = presenter.upgradeModel(model);
@@ -1318,11 +1398,8 @@ function Addonvideo_create() {
 
         $(document).on('webkitfullscreenchange mozfullscreenchange fullscreenchange MSFullscreenChange', presenter.fullscreenChangedEventReceived);
 
-        presenter.videoView.addEventListener('DOMNodeRemoved', function onDOMNodeRemoved(ev) {
-            if (ev.target === this) {
-                presenter.destroy();
-            }
-        });
+        MutationObserverService.createDestroyObserver(presenter.configuration.addonID, presenter.destroy, presenter.$view.get(0));
+		MutationObserverService.setObserver();
 
         presenter.addClickListener();
     };
@@ -1330,7 +1407,7 @@ function Addonvideo_create() {
     presenter.addClickListener = function () {
         var view = document.getElementsByClassName('ic_page');
         $(view[0]).on('click', function (event) {
-            if (presenter.controlBar.isSelectorOpen &amp;&amp; !event.target.localName.includes('select')) {
+            if (presenter.configuration.defaultControls &amp;&amp; presenter.controlBar.isSelectorOpen &amp;&amp; !event.target.localName.includes('select')) {
                 presenter.controlBar.isSelectorOpen = false;
                 presenter.controlBar.hideControls();
             }
@@ -1339,7 +1416,7 @@ function Addonvideo_create() {
         });
 
         $(window).on('click', function (event) {
-            if (presenter.controlBar.isSelectorOpen) {
+            if (presenter.configuration.defaultControls &amp;&amp; presenter.controlBar.isSelectorOpen) {
                 presenter.controlBar.isSelectorOpen = false;
                 presenter.controlBar.hideControls();
             }
@@ -1353,7 +1430,7 @@ function Addonvideo_create() {
             presenter.configuration.isFullScreen = false;
             presenter.removeScaleFromCaptionsContainer();
             fullScreenChange();
-            presenter.controlBar.showFullscreenButton();
+            presenter.configuration.defaultControls &amp;&amp; presenter.controlBar.showFullscreenButton();
 
             presenter.calculatePosterSize(presenter.videoObject, presenter.configuration.addonSize);
             presenter.playerController.setAbleChangeLayout(true);
@@ -1406,9 +1483,18 @@ function Addonvideo_create() {
         var xScale = newVideoSize.width / presenter.originalVideoSize.width;
         var yScale = newVideoSize.height / presenter.originalVideoSize.height;
 
-        presenter.$captionsContainer.css(generateTransformDict(xScale, yScale));
+        if (presenter.configuration.baseDimensions.width != 0) {
+            xScale = xScale * (presenter.configuration.addonSize.width/presenter.configuration.baseDimensions.width);
+        }
+        if (presenter.configuration.baseDimensions.height != 0) {
+            yScale = yScale * (presenter.configuration.addonSize.height/presenter.configuration.baseDimensions.height);
+        }
 
-        presenter.calculateCaptionsOffset(size, false);
+        presenter.$captionsContainer.css(generateTransformDict(xScale, yScale));
+        presenter.captionsScale.xScale = xScale;
+        presenter.captionsScale.yScale = yScale;
+
+        presenter.calculateCaptionsOffset(size, true);
     });
 
     presenter.scaleCaptionsContainerToScreenSize = presenter.metadataLoadedDecorator(function () {
@@ -1424,12 +1510,16 @@ function Addonvideo_create() {
 
 
         presenter.$captionsContainer.css(generateTransformDict(xScale, yScale));
+        presenter.captionsScale.xScale = xScale;
+        presenter.captionsScale.yScale = yScale;
 
         presenter.calculateCaptionsOffset(size, false);
     });
 
     presenter.removeScaleFromCaptionsContainer = presenter.metadataLoadedDecorator(function () {
         presenter.$captionsContainer.css(generateTransformDict(1, 1));
+        presenter.captionsScale.xScale = 1.0;
+        presenter.captionsScale.yScale = 1.0;
 
         presenter.calculateCaptionsOffset(presenter.configuration.addonSize, false);
     });
@@ -1612,7 +1702,7 @@ function Addonvideo_create() {
             } else if (presenter.configuration.isFullScreen) {
                 presenter.configuration.isFullScreen = false;
                 presenter.removeScaleFromCaptionsContainer();
-                presenter.controlBar.showFullscreenButton();
+                presenter.configuration.defaultControls &amp;&amp; presenter.controlBar.showFullscreenButton();
                 presenter.closeFullscreen();
                 shouldSetAbleChangeLayout = true;
 
@@ -1766,11 +1856,34 @@ function Addonvideo_create() {
     };
 
     presenter.setVideo = function () {
-        if (!window.navigator.onLine &amp;&amp; presenter.isOnlineResourceOnly()) {
+        if (!window.navigator.onLine) {
+            isOnlineResourceOnly().then(function (responses){
+                setVideo();
+            }).catch(function(error){
                 presenter.$view.html(presenter.configuration.offlineMessage);
-                return;
+            });
+        } else {
+            setVideo();
         }
+    };
 
+    function isOnlineResourceOnly() {
+        let endpointsToFetch = [];
+        for (let i = 0; i &lt; presenter.configuration.files.length; i++) {
+            const videoFile = presenter.configuration.files[i];
+            !!videoFile["MP4 video"] &amp;&amp; endpointsToFetch.push(videoFile["MP4 video"].trim());
+            !!videoFile["Ogg video"] &amp;&amp; endpointsToFetch.push(videoFile["Ogg video"].trim());
+            !!videoFile["WebM video"] &amp;&amp; endpointsToFetch.push(videoFile["WebM video"].trim());
+        }
+        return Promise.all(endpointsToFetch.map(function(fetchURL) {
+            // method: "Head" - used to check if addon have a connection to video (not for download video)
+            // method: "no-cache" - mLibro has a cache. Added to avoid the situation that once there is video and
+            //      once there is not, when user is offline. Such behavior would be inconsistent with the documentation.
+            return fetch(fetchURL, {method: "Head", cache: "no-cache"});
+        }));
+    }
+
+    function setVideo() {
         if (presenter.videoObject) {
             $(presenter.videoObject).unbind("ended");
             $(presenter.videoObject).unbind("error");
@@ -1792,8 +1905,8 @@ function Addonvideo_create() {
         var $video = $(presenter.videoObject);
         var files = presenter.configuration.files;
 
-        this.videoContainer.find('source').remove();
-        this.addAttributePoster($video[0], files[presenter.currentMovie].Poster);
+        presenter.videoContainer.find('source').remove();
+        presenter.addAttributePoster($video[0], files[presenter.currentMovie].Poster);
 
         presenter.setAltText();
         if (presenter.isPreview) {
@@ -1801,9 +1914,9 @@ function Addonvideo_create() {
         } else {
             $video.attr('preload', 'auto');
             for (var vtype in presenter.videoTypes) {
-                if (files[presenter.currentMovie][this.videoTypes[vtype].name] &amp;&amp; presenter.videoObject.canPlayType(presenter.videoTypes[vtype].type)) {
+                if (files[presenter.currentMovie][presenter.videoTypes[vtype].name] &amp;&amp; presenter.videoObject.canPlayType(presenter.videoTypes[vtype].type)) {
                     var source = $('&lt;source&gt;');
-                    source.attr('type', this.videoTypes[vtype].type);
+                    source.attr('type', presenter.videoTypes[vtype].type);
                     source.attr('src', files[presenter.currentMovie][presenter.videoTypes[vtype].name]);
                     $video.append(source);
                 }
@@ -1812,7 +1925,7 @@ function Addonvideo_create() {
             // "ended" event doesn't work on Safari
             $(presenter.videoObject).unbind('timeupdate');
             $(presenter.videoObject).bind("timeupdate", function () {
-                onTimeUpdate(this);
+                onTimeUpdate(presenter);
             });
 
             $(presenter.videoObject).bind("error", function onError() {
@@ -1863,7 +1976,7 @@ function Addonvideo_create() {
                 });
             }
         }
-    };
+    }
 
     /**
      * Creates DIV element containing caption text.

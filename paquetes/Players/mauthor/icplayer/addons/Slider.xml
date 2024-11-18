@@ -19,6 +19,7 @@
 				<property name="Step" nameLabel="Slider_property_step" type="string"/>
 			</property>
 		</property>
+		<property name="StepwiseModeBarAlwaysVisible" nameLabel="Slider_property_stepwise_mode_bar_always_visible" type="boolean"/>
 	</model>
 <css>.slider-wrapper {
     border: 0 solid black;
@@ -158,6 +159,7 @@
             presenter.moveToStep(imageContainer, presenter.configuration.initialStep, presenter.configuration);
 
             if (!isPreview) {
+                presenter.configuration.stepwiseModeBarAlwaysVisible &amp;&amp; drawBurret();
                 handleMouseDrag(addonContainer);
             } else {
                 drawBurret();
@@ -372,9 +374,8 @@
                     }
                 }
             }
-
         }
-        if(eventData.preventDefault) {
+        if (eventData.preventDefault &amp;&amp; eventData.target &amp;&amp; presenter.$view.find(eventData.target).length) {
             eventData.preventDefault();
         }
     }
@@ -390,7 +391,7 @@
     }
 
     function handleMouseDrag(addonContainer) {
-        var icplayer = $('#_icplayer');
+        const $icplayer = $('#_icplayer');
         presenter.isWindowsMobile = false;
 
         if (window.navigator.msPointerEnabled &amp;&amp; MobileUtils.isMobileUserAgent(window.navigator.userAgent)) {
@@ -417,8 +418,8 @@
         }
 
         $(imageElement).mousedown(mouseDownCallback);
-        icplayer.mousemove(mouseMoveCallback);
-        icplayer.mouseup(presenter.mouseUpEventDispatcher);
+        $icplayer.mousemove(mouseMoveCallback);
+        $icplayer.mouseup(presenter.mouseUpEventDispatcher);
         $(document).mouseup(presenter.mouseUpEventDispatcher);
         imageElement.ontouchend = touchEndCallback;
 
@@ -473,7 +474,8 @@
     }
 
     presenter.upgradeModel = function (model) {
-        var upgradedModel = presenter.upgradeTTS(model);
+        let upgradedModel = presenter.upgradeTTS(model);
+        upgradedModel = presenter.upgradeStepwiseModeBarAlwaysVisible(upgradedModel);
         return upgradedModel;
     };
 
@@ -498,6 +500,17 @@
                     "Step number": ""
                 }
             ];
+        }
+
+        return upgradedModel;
+    };
+
+    presenter.upgradeStepwiseModeBarAlwaysVisible = function (model) {
+        const upgradedModel = {};
+        $.extend(true, upgradedModel, model);
+
+        if (!upgradedModel.hasOwnProperty("StepwiseModeBarAlwaysVisible")) {
+            upgradedModel["StepwiseModeBarAlwaysVisible"] = "False";
         }
 
         return upgradedModel;
@@ -535,13 +548,13 @@
         loadImageElement(preview);
 
         presenter.$view.disableSelection();
-        view.addEventListener('DOMNodeRemoved', presenter.destroy);
+        MutationObserverService.createDestroyObserver(presenter.addonID, presenter.destroy, presenter.view);
+        MutationObserverService.setObserver();
     }
 
     function drawBurret() {
         if (!presenter.configuration.stepwise) return;
 
-        var element = presenter.$view.find('.slider-element-image:first')[0];
         var xPosition = $(presenter.$view).width() / 2;
         var yPosition = $(presenter.$view).height() / 2;
         var verticalLineLength = $(presenter.$view).height() / 4;
@@ -555,7 +568,8 @@
         });
         $(canvas).attr('width', $(presenter.$view).width());
         $(canvas).attr('height', $(presenter.$view).height());
-        $(presenter.$view).append(canvas);
+        $(canvas).addClass('slider-stepwise-bar');
+        $(presenter.$view).prepend(canvas);
 
         if (presenter.configuration.orientation === presenter.ORIENTATION.LANDSCAPE) {
             $(canvas).drawLine({
@@ -886,7 +900,8 @@
             shouldBlockInErrorMode: ModelValidationUtils.validateBoolean(model["Block in error checking mode"]),
             speechTexts: speechTexts,
             lang: model["langAttribute"],
-            altTexts: validatedAltTexts.value
+            altTexts: validatedAltTexts.value,
+            stepwiseModeBarAlwaysVisible: ModelValidationUtils.validateBoolean(model["StepwiseModeBarAlwaysVisible"])
         };
     };
 
@@ -1120,9 +1135,15 @@
         presenter.removeDisabledClass();
     };
 
-    presenter.destroy = function () {
+    presenter.destroy = function (event) {
+        if (event.target !== presenter.view) {
+            return;
+        }
+
+        const $icplayer = $('#_icplayer');
+        $icplayer.off("mousemove", mouseMoveCallback);
+        $icplayer.off("mouseup", presenter.mouseUpEventDispatcher);
         $(document).off('mouseup', presenter.mouseUpEventDispatcher);
-        presenter.view.removeEventListener('DOMNodeRemoved', presenter.destroy);
     };
 
     return presenter;

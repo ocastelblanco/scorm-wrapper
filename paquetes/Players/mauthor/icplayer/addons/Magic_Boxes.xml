@@ -254,7 +254,9 @@
 
                 var selectableElement = $(document.createElement('div'));
                 selectableElement.addClass(presenter.CSS_CLASSES.ELEMENT);
-                selectableElement.text(presenter.configuration.gridElements[row][column].toUpperCase());
+                var rawChar = presenter.configuration.gridElements[row][column];
+                var charToShow = isCharacterToCapitalize(rawChar) ? rawChar.toUpperCase() : rawChar;
+                selectableElement.text(charToShow);
 
                 wrapperElement.append(selectableElement);
                 gridContainer.append(wrapperElement);
@@ -382,6 +384,10 @@
         });
     }
 
+    function isCharacterToCapitalize (character) {
+        return !(/\u00DF/.test(character));
+    }
+
     presenter.calculateScoreForEvent = function (prevScore, currentScore) {
         var score;
         if(currentScore &gt; prevScore){
@@ -415,6 +421,7 @@
     }
 
     function applySelectionStyle(row, column) {
+        if (row &gt;= presenter.configuration.rows || column &gt;= presenter.configuration.columns) return;
         var index = row * presenter.configuration.columns + column;
         var element = gridContainerWrapper.find(`.${presenter.CSS_CLASSES.ELEMENT}:eq(${index})`);
 
@@ -1260,8 +1267,6 @@
     };
 
     presenter.isAllOK = function () {
-        if (!presenter.isSelectionPossible) return;
-
         return presenter.getMaxScore() === presenter.getScore() &amp;&amp; presenter.getErrorCount() === 0;
     };
 

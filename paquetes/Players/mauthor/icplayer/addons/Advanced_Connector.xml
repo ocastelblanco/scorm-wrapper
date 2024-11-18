@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?><addon xmlns="http://icplayer.com" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" id="Advanced_Connector" xsi:schemaLocation="http://icplayer.com ../../tools/addon.xsd">
 	<model>
-		<property isDefault="true" name="Scripts" nameLabel="Advanced_Connector_property_scripts" type="text"/>
+		<property isDefault="true" name="Scripts" nameLabel="Advanced_Connector_property_scripts" type="editablescript"/>
         <property name="Is disabled" nameLabel="Advanced_Connector_property_is_disabled" type="boolean"/>
 	</model>
 <css/><view/><preview/><presenter>function AddonAdvanced_Connector_create() {
@@ -20,7 +20,9 @@
         'Done',
         'AllAttempted',
         'NotAllAttempted',
-        'LimitedCheck'
+        'LimitedCheck',
+        'GradualShowAnswers',
+        'GradualHideAnswers',
     ];
 
     presenter.setPlayerController = function (controller) {
@@ -32,11 +34,12 @@
             return;
         }
         var i, length;
-        event = presenter.fillEventData(eventData, eventName);
+        let filledEventData = presenter.fillEventData(eventData, eventName);
 
         try {
-            var filteredEvents = presenter.filterEvents(presenter.events, event);
+            var filteredEvents = presenter.filterEvents(presenter.events, filledEventData);
             for (i = 0, length = filteredEvents.length; i &lt; length; i++) {
+                event = filledEventData;
                 eval(filteredEvents[i].Code);
             }
         } catch (error) {

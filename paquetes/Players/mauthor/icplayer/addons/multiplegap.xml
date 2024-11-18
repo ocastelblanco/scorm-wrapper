@@ -434,15 +434,23 @@
     function scaledOriginalPositionDecorator(obj, fn) {
 
         function getScale() {
-            var $content = $("#content");
-            if($content.size() &gt; 0) {
-                var contentElem = $content[0];
-                var scaleX = contentElem.getBoundingClientRect().width / contentElem.offsetWidth;
-                var scaleY = contentElem.getBoundingClientRect().height / contentElem.offsetHeight;
+            if (presenter.playerController) {
+                const scaleInformation = presenter.playerController.getScaleInformation();
+                if (scaleInformation.baseScaleX !== 1.0 ||
+                    scaleInformation.baseScaleY !== 1.0 ||
+                    scaleInformation.scaleX !== 1.0 ||
+                    scaleInformation.scaleY !== 1.0
+                ) {
+                    return {X: scaleInformation.scaleX, Y: scaleInformation.scaleY};
+                }
+            }
+
+            const $content = $("#content");
+            if ($content.size() &gt; 0) {
+                const contentElem = $content[0];
+                const scaleX = contentElem.getBoundingClientRect().width / contentElem.offsetWidth;
+                const scaleY = contentElem.getBoundingClientRect().height / contentElem.offsetHeight;
                 return {X: scaleX, Y: scaleY};
-            } else if (presenter.playerController) {
-                var scale = presenter.playerController.getScaleInformation();
-                return {X: scale.scaleX, Y: scale.scaleY}
             } else {
                 return {X: 1.0, Y: 1.0};
             }
@@ -836,8 +844,14 @@
     };
 
     presenter.createDraggableTextItem = function(item) {
-        const child = $('&lt;p class="contents"&gt;&lt;/p&gt;');
+        var child = $('&lt;p class="contents"&gt;&lt;/p&gt;');
         child.html(presenter.parseItemValue(item.value));
+
+        if (presenter.playerController) {
+            child.html(presenter.playerController.getTextParser().parseAltTexts(child.html()));
+        } else {
+            child = window.TTSUtils.parsePreviewAltText(child);
+        }
 
         return child;
     };
@@ -1001,12 +1015,12 @@
             if (presenter.configuration.sourceType === presenter.SOURCE_TYPES.IMAGES) {
                 altText = child.attr('alt');
                 langTag = child.attr('lang');
+                voicesArray.push(getTextVoiceObject(altText,langTag));
             } else {
-                altText = child.text();
-                langTag = presenter.configuration.langTag;
+                // presenter.SOURCE_TYPES.TEXTS
+                voicesArray = voicesArray.concat(window.TTSUtils.getTextVoiceArrayFromElement(child, presenter.configuration.langTag));
             }
         }
-        voicesArray.push(getTextVoiceObject(altText,langTag));
         presenter.speak(voicesArray);
     }
     
@@ -1158,7 +1172,7 @@
     presenter.performRemoveDraggable = function(handler) {
         presenter.elementCounter--;
         var placeholder = handler.parent();
-        var child = placeholder.find('.contents');
+        var child = placeholder.find('.contents, .multiaudio-item-text');
         if(isWCAGOn) {
             var altText = "";
             var langTag = "";
@@ -1167,11 +1181,10 @@
             if (presenter.configuration.sourceType === presenter.SOURCE_TYPES.IMAGES) {
                 altText = child.attr('alt');
                 langTag = child.attr('lang');
+                voicesArray.push(getTextVoiceObject(altText,langTag));
             } else {
-                altText = child.text();
-                langTag = presenter.configuration.langTag;
+                voicesArray = voicesArray.concat(window.TTSUtils.getTextVoiceArrayFromElement(child, presenter.configuration.langTag));
             }
-            voicesArray.push(getTextVoiceObject(altText,langTag));
             presenter.speak(voicesArray);
         }
 
@@ -1417,14 +1430,22 @@
         
         presenter.clearSelected();
         
-        if (presenter.configuration.isVisibleByDefault) {
+        presenter.handleDisplayingAddon();
+        presenter.keyboardControllerObject.setElements(presenter.getElementsForKeyboardNavigation());
+        presenter.elementCounter = 0;
+    };
+
+    presenter.isVisible = function() {
+        return presenter.$view.css("visibility") === 'visible';
+    }
+
+    presenter.handleDisplayingAddon = function () {
+        if (presenter.configuration.isVisibleByDefault &amp;&amp; presenter.isVisible()) {
             presenter.show();
         } else {
             presenter.hide();
         }
-        presenter.keyboardControllerObject.setElements(presenter.getElementsForKeyboardNavigation());
-        presenter.elementCounter = 0;
-    };
+    }
     
     presenter.getState = function() {
         function getBaseState(placeholders) {
@@ -1574,7 +1595,7 @@
                     var $this = $(this);
                     if ($this.attr('data-addon-id') === eventData.source) {
                         if ($this.attr('data-audio-id') === eventData.item) {
-                            if (eventData.value === "00:00") {
+                            if (eventData.value === "00:00" || eventData.value === "pause") {
                                 $this.removeClass('playing');
                             } else if (eventData.value === "playing") {
                                 $this.addClass('playing');
@@ -1792,7 +1813,7 @@
             } else {
                 $child = $placeholder.find("p.contents");
                 if ($child.length &gt; 0){
-                    voicesArray.push(getTextVoiceObject($child.text(),presenter.configuration.langTag));
+                    voicesArray = window.TTSUtils.getTextVoiceArrayFromElement($child, presenter.configuration.langTag);
                 } else {
                     $child = $placeholder.find('.multiaudio-item-text');
                     if ($child.length &gt; 0){
@@ -1996,11 +2017,19 @@
 
     function setUpResetOnce() {
          presenter.resetOnce = (function() {
-            var didReset = false;
+            let didReset = false;
             return function() {
                 if(!didReset) {
                     didReset = true;
-                    presenter.reset();
+                    if(presenter.isShowAnswersActive){
+                        presenter.hideAnswers();
+                    }
+
+                    presenter.$view.find('.placeholder').remove();
+                    presenter.setWorkMode();
+                    presenter.clearSelected();
+                    presenter.keyboardControllerObject.setElements(presenter.getElementsForKeyboardNavigation());
+                    presenter.elementCounter = 0;
                 }
             };
         })();

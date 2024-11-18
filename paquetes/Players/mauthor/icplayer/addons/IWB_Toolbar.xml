@@ -16,19 +16,46 @@
         <property name="enableUndoRedo" nameLabel="IWB_Toolbar_property_enable_undo_redo" type="boolean"/>
         <property name="disableModuleZoom" nameLabel="IWB_Toolbar_property_disable_module_zoom" type="boolean"/>
         <property name="defaultZoom" nameLabel="IWB_Toolbar_property_default_zoom" type="string"/>
+        <property displayName="Expansion direction" name="expansionDirection" nameLabel="IWB_Toolbar_expansion_direction" type="{right, left, up, down}"/>
+        <property displayName="Vertical popups direction" name="verticalPopupDirection" nameLabel="IWB_Toolbar_vertical_popups_direction" type="{right, left}"/>
+        <property displayName="Horizontal popups direction" name="horizontalPopupDirection" nameLabel="IWB_Toolbar_horizontal_popups_direction" type="{down, up}"/>
     </model>
 <css>.iwb-toolbar-panel {
     padding: 5px 25px;
     cursor: move;
     border-radius: 3px;
     min-width: 30px;
-    width: 30px;
     min-height: 30px;
     box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.6);
     background-color: rgba(255, 255, 255, 0.8);
     background-image: url('resources/wb_panel_move_icon.svg'), url('resources/wb_panel_move_icon.svg');
     background-position: left center, right center;
     background-repeat: no-repeat;
+}
+
+.iwb-toolbar-panel.right {
+    width: 30px;
+}
+
+.iwb-toolbar-panel.left {
+    display: flex;
+    flex-direction: row-reverse;
+    flex-wrap: wrap;
+    width: 30px;
+}
+
+.iwb-toolbar-panel.up {
+    display: flex;
+    flex-direction: column-reverse;
+    flex-wrap: wrap;
+    height: 30px;
+}
+
+.iwb-toolbar-panel.down {
+    display: flex;
+    flex-direction: column;
+    flex-wrap: wrap;
+    height: 30px;
 }
 
 .iwb-toolbar-panel.running {
@@ -42,6 +69,15 @@
     height: 30px;
     background-color: rgba(150, 150, 150, 0.6);
     margin-left: 5px;
+}
+
+.iwb-toolbar-panel.up .button-separator,
+.iwb-toolbar-panel.down .button-separator {
+    width: 30px;
+    float: inherit;
+    height: 1px;
+    margin-top: 5px;
+    margin-left: 0px;
 }
 
 .iwb-toolbar-panel .button.clicked {
@@ -66,12 +102,30 @@
     cursor: pointer;
 }
 
-.iwb-toolbar-panel .button.hidden, .iwb-toolbar-panel .button-separator.hidden {
-    display: none;
+.iwb-toolbar-panel.up .button,
+.iwb-toolbar-panel.up .button-drawing-details,
+.iwb-toolbar-panel.up .button-floating-image,
+.iwb-toolbar-panel.down .button,
+.iwb-toolbar-panel.down .button-drawing-details,
+.iwb-toolbar-panel.down .button-floating-image {
+    float: inherit;
+    margin-top: 5px;
+    margin-left: 0px;
 }
 
-.iwb-toolbar-panel .button.first {
+.iwb-toolbar-panel.left .button.first,
+.iwb-toolbar-panel.right .button.first {
     margin-left: 0px;
+}
+
+.iwb-toolbar-panel.up .button.first,
+.iwb-toolbar-panel.down .button.first{
+    margin-top: 0px;
+}
+
+.iwb-toolbar-panel .button.hidden,
+.iwb-toolbar-panel .button-separator.hidden {
+    display: none;
 }
 
 .iwb-toolbar-panel .button.hovered {
@@ -114,17 +168,62 @@
     position: absolute;
 }
 
-.iwb-toolbar-panel .bottom-panel .container {
+.iwb-toolbar-panel.right .bottom-panel .container {
     float: right;
     margin-top: 5px;
 }
 
-.iwb-toolbar-panel .bottom-panel-floating-image {
+.iwb-toolbar-panel.left .bottom-panel .container {
+    display: flex;
+    flex-direction: row-reverse;
+    float: right;
+    margin-top: 5px;
+}
+
+.iwb-toolbar-panel.up .bottom-panel .container {
+    display: flex;
+    flex-direction: column-reverse;
+    float: right;
+    margin-left: 5px;
+}
+
+.iwb-toolbar-panel.down .bottom-panel .container {
+    display: flex;
+    flex-direction: column;
+    float: right;
+    margin-left: 5px;
+}
+
+.iwb-toolbar-panel.right .bottom-panel-floating-image {
     margin-right: 77px;
+}
+
+.iwb-toolbar-panel.left .bottom-panel-floating-image {
+    margin-left: 77px;
+}
+
+.iwb-toolbar-panel.up .bottom-panel-floating-image {
+    margin-top: 77px;
+}
+
+.iwb-toolbar-panel.down .bottom-panel-floating-image {
+    margin-bottom: 77px;
 }
 
 .iwb-toolbar-panel .bottom-panel {
     display: none;
+}
+
+.iwb-toolbar-panel.left .bottom-panel {
+    margin-right: auto;
+}
+
+.iwb-toolbar-panel.up .bottom-panel {
+    margin-bottom: auto;
+}
+
+.iwb-toolbar-panel.down .bottom-panel {
+    margin-top: auto;
 }
 
 .iwb-toolbar-panel .button.close, .iwb-toolbar-panel .button.open {
@@ -582,7 +681,6 @@
     display: none;
     opacity: 1;
     position: absolute;
-    top: -20px;
     font-size: 8px;
     line-height: 8px;
     min-width: 30px;
@@ -590,6 +688,16 @@
     border-radius: 2px;
     background-color: rgba(255, 255, 255, 0.5);
     box-shadow: 1px 1px 5px rgba(0, 0, 0, 0.6);
+}
+
+.iwb-toolbar-panel.right .button .tooltip,
+.iwb-toolbar-panel.left .button .tooltip{
+    top: -20px;
+}
+
+.iwb-toolbar-panel.up .button .tooltip,
+.iwb-toolbar-panel.down .button .tooltip{
+    left: -30px;
 }
 
 .iwb-toolbar-panel .button.default .tooltip span:after {
@@ -834,6 +942,14 @@ canvas {
     height: 10px;
 }
 
+.iwb-toolbar-panel.up .ui-helper-clearfix:before,
+.iwb-toolbar-panel.down .ui-helper-clearfix:before,
+.iwb-toolbar-panel.up .ui-helper-clearfix:after,
+.iwb-toolbar-panel.down .ui-helper-clearfix:after {
+    height: 0px;
+    width: 10px;
+}
+
 #iwb_tmp_canvas {
     position: absolute;
     left: 0px; right: 0;
@@ -1003,6 +1119,10 @@ canvas {
     presenter.areZoomEventHandlersAttached = false;
 
     var DEFAULT_COLOR = '#0fa9f0';
+    var GAP_VALUE = 10;
+    var STOPWATCH_OFFSET = 60;
+    var CLOCK_OFFSET = 60;
+    var NOTE_OFFSET = 120;
     presenter.activeButton = '';
     presenter.activeFunction;
     presenter.isRecklicked = false;
@@ -1013,6 +1133,7 @@ canvas {
     presenter.points = [];
     presenter.mouse = {x: 0, y: 0};
 
+    presenter.trueClosedPanelSize = {};
 
     presenter.data = {
         defaultPenWidth: 1,
@@ -1030,7 +1151,7 @@ canvas {
     presenter.stopwatches = [];
     presenter.currentLineColor = DEFAULT_COLOR;
     presenter.currentLineWidth = presenter.data.defaultPenWidth;
-    presenter.isMouseDown = false;
+    presenter.isPointerDown = false;
     presenter.lastMousePosition = {};
     presenter.floatingImageGroups = {};
     presenter.currentFloatingImageIndex = 0;
@@ -1038,6 +1159,14 @@ canvas {
 
     presenter.penUsed = false;
     presenter.markerUsed = false;
+    presenter.isPointerEventSupported = !!window.PointerEvent;
+
+    presenter.notesCounter = 0;
+    presenter.POPUP_TYPE = {
+        STOPWATCH: 'stopwatch',
+        CLOCK: 'clock',
+        NOTE: 'note'
+    };
 
     presenter.zoomConfiguration = {
         initialWindowHeight: 0,
@@ -1174,26 +1303,62 @@ canvas {
     };
 
     presenter.ERROR_CODES = {
-        'E01': 'Width can NOT be negative.'
+        'E01': 'Width can NOT be negative.',
+        'E02': 'Height can NOT be negative.',
     };
 
-    presenter.closePanel = function IWB_Toolbar_closePanel() {
+    presenter.closePanel = function IWB_Toolbar_closePanel(doAnimation) {
         if (!presenter.$panel.hasClass('animationInProgress')) {
-            presenter.$bottomPanels.addClass('closed-hide');
-
-            presenter.$panel.addClass('animationInProgress');
-            presenter.$panel.children('.button-separator').hide();
-            presenter.$buttonsExceptOpen.addClass('hidden');
-
-            presenter.$panel.animate({
-                'width' : presenter.config.widthWhenClosed - 50 + 'px'
-            }, 1000, function() {
-                presenter.$panel.children('.button.open').show();
-                presenter.$panel.removeClass('animationInProgress');
-                presenter.$panel.removeClass('opened');
-            });
-
             window.savedPanel.isOpen = false;
+
+            presenter.$bottomPanels.addClass('closed-hide');
+            presenter.$buttonsExceptOpen.addClass('hidden');
+            presenter.$panel.children('.button-separator').hide();
+
+            var config = {};
+            var openedPanelPosition = {
+                left: presenter.$panel.position().left,
+                top: presenter.$panel.position().top
+            };
+            let positionToSave = {};
+            $.extend(true, positionToSave, openedPanelPosition);
+
+            var newLeft = openedPanelPosition.left + presenter.config.widthWhenOpened - presenter.trueClosedPanelSize.width;
+            var newTop = openedPanelPosition.top + presenter.config.widthWhenOpened - presenter.trueClosedPanelSize.height;
+            if (presenter.config.expansionDirection == "right" || presenter.config.expansionDirection == "left") {
+                config.width = presenter.trueClosedPanelSize.width + 'px';
+                if (presenter.config.expansionDirection == "left") {
+                    config.left = newLeft + 'px';
+                    positionToSave.left = newLeft;
+                }
+            } else {
+                config.height = presenter.trueClosedPanelSize.height + 'px';
+                if (presenter.config.expansionDirection == "up") {
+                    config.top = newTop + 'px';
+                    positionToSave.top = newTop;
+                }
+            }
+
+            if (presenter.config.panelPosition === 'fixed') {
+                positionToSave.top -= presenter.$pagePanel.offset().top;
+                positionToSave.left -= presenter.$pagePanel.offset().left;
+            }
+
+            window.savedPanel.position = {
+                top: positionToSave.top,
+                left: positionToSave.left
+            };
+
+            if (doAnimation) {
+                presenter.$panel.addClass('animationInProgress');
+                presenter.$panel.animate(config, 1000, presenter._closePanelShow);
+            } else {
+                presenter._closePanelShow();
+                config.hasOwnProperty("width") &amp;&amp; presenter.$panel.css("width", config.width);
+                config.hasOwnProperty("height") &amp;&amp; presenter.$panel.css("height", config.height);
+                config.hasOwnProperty("left") &amp;&amp; presenter.$panel.css("left", config.left);
+                config.hasOwnProperty("top") &amp;&amp; presenter.$panel.css("top", config.top);
+            }
         }
     };
 
@@ -1207,17 +1372,44 @@ canvas {
         presenter.toogleMasks();
     };
 
+    presenter._closePanelShow = function IWB_Toolbar_closePanelShow() {
+        presenter.$panel.children('.button.open').show();
+        presenter.$panel.removeClass('animationInProgress');
+        presenter.$panel.removeClass('opened');
+    };
+
     presenter.openPanel = function IWB_Toolbar_openPanel(doAnimation) {
         window.savedPanel.isOpen = true;
 
+        var config = {};
+        var closedPanelPosition = {
+            left: presenter.$panel.position().left,
+            top: presenter.$panel.position().top
+        };
+
+        var newLeft = closedPanelPosition.left + presenter.trueClosedPanelSize.width - presenter.config.widthWhenOpened;
+        var newTop = closedPanelPosition.top + presenter.trueClosedPanelSize.height - presenter.config.widthWhenOpened;
+        if (presenter.config.expansionDirection == "right" || presenter.config.expansionDirection == "left") {
+            config.width = presenter.config.widthWhenOpened + "px";
+            if (presenter.config.expansionDirection == "left") {
+                config.left = newLeft + "px";
+            }
+        } else {
+            config.height = presenter.config.widthWhenOpened + "px";
+            if (presenter.config.expansionDirection == "up") {
+                config.top = newTop + "px";
+            }
+        }
+
         if (doAnimation) {
             presenter.$panel.addClass('animationInProgress');
-            presenter.$panel.animate({
-                'width' : presenter.config.widthWhenOpened + 'px'
-            }, 1000, presenter._openPanelShow);
+            presenter.$panel.animate(config, 1000, presenter._openPanelShow);
         } else {
             presenter._openPanelShow();
-            presenter.$panel.css('width', presenter.config.widthWhenOpened + 'px');
+            config.hasOwnProperty("width") &amp;&amp; presenter.$panel.css("width", config.width);
+            config.hasOwnProperty("height") &amp;&amp; presenter.$panel.css("height", config.height);
+            config.hasOwnProperty("left") &amp;&amp; presenter.$panel.css("left", config.left);
+            config.hasOwnProperty("top") &amp;&amp; presenter.$panel.css("top", config.top);
         }
     };
 
@@ -1247,15 +1439,11 @@ canvas {
     }
 
     presenter.IWBDraw = function(canvas, ctx, mousePosition) {
-        var grad = ctx.createLinearGradient(0, 0, canvas[0].width, 0);
+        const grad = ctx.createLinearGradient(0, 0, canvas[0].width, 0);
         grad.addColorStop(0, presenter.currentLineColor);
         grad.addColorStop(1, presenter.currentLineColor);
 
-        if (presenter.drawMode == presenter.DRAW_MODE.ERASER){
-            ctx.lineWidth = presenter.currentEraserThickness;
-        }else{
-            ctx.lineWidth = presenter.currentLineWidth;
-        }
+        ctx.lineWidth = presenter.drawMode === presenter.DRAW_MODE.ERASER ? presenter.currentEraserThickness : presenter.currentLineWidth;
         ctx.strokeStyle = grad;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
@@ -1272,7 +1460,7 @@ canvas {
         if(e.target.id == "iwb_tmp_canvas") {
             canvas = presenter.$view.parent().find('.selecting').find('#iwb_tmp_canvas')[0];
         } else {
-            canvas = presenter.canvas[0];
+            canvas = presenter.$canvas[0];
         }
 
         var rect = canvas.getBoundingClientRect();
@@ -1282,10 +1470,12 @@ canvas {
             canvasOffsetLeft = 0;
         }
 
-        if (e.clientX) {
+        const clientX = e.originalEvent ? e.originalEvent.clientX : e.clientX;
+        const clientY = e.originalEvent ? e.originalEvent.clientY : e.clientY;
+        if (clientX) {
             return getPoint(
-                parseInt(e.clientX - rect.left, 10),
-                parseInt(e.clientY - rect.top, 10)
+                parseInt(clientX - rect.left, 10),
+                parseInt(clientY - rect.top, 10)
             );
         }
 
@@ -1374,14 +1564,13 @@ canvas {
     function getTouchStartOrMouseDownEventName() {
         if (MobileUtils.isMobileUserAgent(navigator.userAgent)) {
             return 'touchstart';
-        }else{
-            return 'mousedown';
         }
+        return getPointingDownEventName();
     }
 
     presenter.onMobilePaint = function(e) {
         var iwb_tmp_canvas;
-        iwb_tmp_canvas = presenter.iwb_tmp_canvas;
+        iwb_tmp_canvas = presenter.markerTmpCanvas;
 
         e.preventDefault();
         e.stopPropagation();
@@ -1396,8 +1585,8 @@ canvas {
 
     presenter.onPaint = function(e) {
         var iwb_tmp_canvas, tmp_ctx;
-        iwb_tmp_canvas = presenter.iwb_tmp_canvas;
-        tmp_ctx = presenter.tmp_ctx;
+        iwb_tmp_canvas = presenter.markerTmpCanvas;
+        tmp_ctx = presenter.markerTmpCtx;
         tmp_ctx.globalAlpha = 0.4;
 
         tmp_ctx.lineWidth = presenter.currentMarkerThickness;
@@ -1437,78 +1626,83 @@ canvas {
         }
     };
 
-    presenter.onTouchStartCallback = function (e) {
-        e.preventDefault();
-        e.stopPropagation();
+    presenter.onTouchStartCallback = function (event) {
+        event.preventDefault();
+        event.stopPropagation();
 
         setOverflowWorkAround(true);
 
-            presenter.onMobilePaint(e);
-            presenter.iwb_tmp_canvas.addEventListener('touchmove', presenter.onMobilePaint);
-
+        presenter.onMobilePaint(event);
+        presenter.markerTmpCanvas.addEventListener('touchmove', presenter.onMobilePaint);
     };
 
     function saveMarkerDataUrl() {
-        presenter.markerDataUrl = presenter.markerCanvas[0].toDataURL('image/png');
-    };
+        presenter.markerDataUrl = presenter.$markerCanvas[0].toDataURL('image/png');
+    }
 
-    presenter.onTouchEndEventCallback = function (e) {
-        e.stopPropagation();
+    presenter.onTouchEndEventCallback = function (event) {
+        event.stopPropagation();
 
         setOverflowWorkAround(false);
 
         presenter.markerUsed = true;
 
-        presenter.iwb_tmp_canvas.removeEventListener('touchmove', presenter.onMobilePaint, false);
-        presenter.markerCtx.drawImage(presenter.iwb_tmp_canvas, 0, 0);
-        presenter.tmp_ctx.clearRect(0, 0, presenter.iwb_tmp_canvas.width, presenter.iwb_tmp_canvas.height);
+        presenter.markerTmpCanvas.removeEventListener('touchmove', presenter.onMobilePaint, false);
+        presenter.markerCtx.drawImage(presenter.markerTmpCanvas, 0, 0);
+        presenter.markerTmpCtx.clearRect(0, 0, presenter.markerTmpCanvas.width, presenter.markerTmpCanvas.height);
 
         presenter.points = [];
         saveMarkerDataUrl();
     };
 
-    presenter.markerMouseDownHandler = function IWB_Toolbar_markerMouseDownHandler(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        presenter.isMouseDown = true;
+    presenter.markerPointerDownHandler = function IWB_Toolbar_markerPointerDownHandler(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        if (!isPrimaryEvent(event)) {
+            return;
+        }
+        presenter.isPointerDown = true;
         setOverflowWorkAround(true);
 
-        presenter.iwb_tmp_canvas.addEventListener('mousemove', presenter.onPaint, false);
+        presenter.markerTmpCanvas.addEventListener(getPointingMoveEventName(), presenter.onPaint, false);
 
-        var x = typeof e.offsetX !== 'undefined' ? e.offsetX : e.layerX;
-        var y = typeof e.offsetY !== 'undefined' ? e.offsetY : e.layerY;
-
-        presenter.points.push({x: x, y: y});
+        presenter.points.push({
+            x: typeof event.offsetX !== 'undefined' ? event.offsetX : event.layerX,
+            y: typeof event.offsetY !== 'undefined' ? event.offsetY : event.layerY
+        });
     };
 
-    presenter.markerMouseMoveHandler = function IWB_Toolbar_mouseMoveHandler(e) {
-        if (presenter.isMouseDown) {
-            e.stopPropagation();
-            e.preventDefault();
-            if (presenter.drawMode == presenter.DRAW_MODE.MARKER) {
-                var x = typeof e.offsetX !== 'undefined' ? e.offsetX : e.layerX;
-                var y = typeof e.offsetY !== 'undefined' ? e.offsetY : e.layerY;
-
-                presenter.mouse.x = x;
-                presenter.mouse.y = y;
-            }
+    presenter.markerPointerMoveHandler = function IWB_Toolbar_markerPointerMoveHandler(event) {
+        if (!presenter.isPointerDown) {
+            return;
         }
+
+        event.stopPropagation();
+        event.preventDefault();
+        if (!isPrimaryEvent(event) || presenter.drawMode !== presenter.DRAW_MODE.MARKER) {
+            return;
+        }
+
+        presenter.mouse.x = typeof event.offsetX !== 'undefined' ? event.offsetX : event.layerX;
+        presenter.mouse.y = typeof event.offsetY !== 'undefined' ? event.offsetY : event.layerY;
     };
 
-    presenter.markerMouseUpHandler = function IWB_Toolbar_mouseUpHandler(e) {
-        e.stopPropagation();
-        e.preventDefault();
+    presenter.markerPointerUpHandler = function IWB_Toolbar_markerPointerUpHandler(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        if (!isPrimaryEvent(event)) {
+            return;
+        }
 
-        if (presenter.isMouseDown) {
+        if (presenter.isPointerDown) {
             presenter.markerUsed = true;
         }
-
-        presenter.isMouseDown = false;
+        presenter.isPointerDown = false;
         setOverflowWorkAround(false);
 
-        presenter.iwb_tmp_canvas.removeEventListener('mousemove', presenter.onPaint, false);
-        presenter.markerCtx.drawImage(presenter.iwb_tmp_canvas, 0, 0);
-        presenter.tmp_ctx.clearRect(0, 0, presenter.iwb_tmp_canvas.width, presenter.iwb_tmp_canvas.height);
+        presenter.markerTmpCanvas.removeEventListener(getPointingMoveEventName(), presenter.onPaint, false);
+        presenter.markerCtx.drawImage(presenter.markerTmpCanvas, 0, 0);
+        presenter.markerTmpCtx.clearRect(0, 0, presenter.markerTmpCanvas.width, presenter.markerTmpCanvas.height);
 
         presenter.points = [];
         saveMarkerDataUrl();
@@ -1517,71 +1711,72 @@ canvas {
     };
 
     presenter.markerDrawingLogic = function IWB_Toolbar_markerDrawingLogic() {
-        if (MobileUtils.isEventSupported('touchstart')) {
-            presenter.iwb_tmp_canvas.removeEventListener('touchstart', presenter.onTouchStartCallback, false);
-            presenter.iwb_tmp_canvas.removeEventListener('touchend', presenter.onTouchEndEventCallback, false);
-        }else{
-            presenter.iwb_tmp_canvas.removeEventListener('mousemove', presenter.markerMouseMoveHandler, false);
-            presenter.iwb_tmp_canvas.removeEventListener('mousedown', presenter.markerMouseDownHandler, false);
-            presenter.iwb_tmp_canvas.removeEventListener('mouseup', presenter.markerMouseUpHandler, false);
-        }
+        $(presenter.markerTmpCanvas).off();
 
-        if (MobileUtils.isEventSupported('touchstart')) {
-            presenter.iwb_tmp_canvas.addEventListener('touchstart', presenter.onTouchStartCallback, false);
-            presenter.iwb_tmp_canvas.addEventListener('touchend', presenter.onTouchEndEventCallback, false);
+        if (presenter.isPointerEventSupported || !MobileUtils.isEventSupported('touchstart')) {
+            presenter.markerTmpCanvas.addEventListener(getPointingDownEventName(), presenter.markerPointerDownHandler, false);
+            presenter.markerTmpCanvas.addEventListener(getPointingMoveEventName(), presenter.markerPointerMoveHandler, false);
+            presenter.markerTmpCanvas.addEventListener(getPointingUpEventName(), presenter.markerPointerUpHandler, false);
+            presenter.markerTmpCanvas.addEventListener(getPointingEventName("leave"), presenter.markerPointerUpHandler, false);
         } else {
-            // MOUSE
-            presenter.iwb_tmp_canvas.addEventListener('mousemove', presenter.markerMouseMoveHandler, false);
-            $(presenter.iwb_tmp_canvas).on('mouseleave', presenter.markerMouseUpHandler);
-            presenter.iwb_tmp_canvas.addEventListener('mousedown', presenter.markerMouseDownHandler, false);
-            presenter.iwb_tmp_canvas.addEventListener('mouseup', presenter.markerMouseUpHandler, false);
+            presenter.markerTmpCanvas.addEventListener('touchstart', presenter.onTouchStartCallback, false);
+            presenter.markerTmpCanvas.addEventListener('touchend', presenter.onTouchEndEventCallback, false);
         }
     };
 
-
-    presenter.penMouseDownHandler = function IWB_Toolbar_penMouseDownHandler(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        presenter.lastMousePosition = getCursorPosition(e);
-        presenter.isMouseDown = true;
+    presenter.penPointerDownHandler = function IWB_Toolbar_penPointerDownHandler(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        if (!isPrimaryEvent(event)) {
+            return;
+        }
+        presenter.lastMousePosition = getCursorPosition(event);
+        presenter.isPointerDown = true;
         setOverflowWorkAround(true);
     };
 
-    presenter.penMouseMoveHandler = function IWB_Toolbar_penMouseMoveHandler(e) {
-        if (presenter.isMouseDown) {
-            e.stopPropagation();
-            e.preventDefault();
-            if (presenter.drawMode == presenter.DRAW_MODE.MARKER) {
-                presenter.IWBDraw(presenter.markerCanvas, presenter.markerCtx, getCursorPosition(e));
-            } else if (presenter.drawMode == presenter.DRAW_MODE.PEN) {
-                presenter.IWBDraw(presenter.canvas, presenter.ctx, getCursorPosition(e));
-            } else if (presenter.drawMode == presenter.DRAW_MODE.ERASER) {
-                presenter.IWBDraw(presenter.markerCanvas, presenter.markerCtx, getCursorPosition(e));
-                presenter.IWBDraw(presenter.canvas, presenter.ctx, getCursorPosition(e));
-
-                var android_ver = MobileUtils.getAndroidVersion(window.navigator.userAgent);
-                if (["4.1.1", "4.1.2", "4.2.2", "4.3", "4.4.2"].indexOf(android_ver) !== -1) {
-                    $('canvas').css('opacity', '0.99');
-
-                    setTimeout(function() {
-                        $('canvas').css('opacity', '1');
-                    }, 5);
-                }
-            }
-            presenter.lastMousePosition = getCursorPosition(e);
+    presenter.penPointerMoveHandler = function IWB_Toolbar_penPointerMoveHandler(event) {
+        if (!presenter.isPointerDown) {
+            return;
         }
+
+        event.stopPropagation();
+        event.preventDefault();
+        if (!isPrimaryEvent(event)) {
+            return;
+        }
+
+        if (presenter.drawMode === presenter.DRAW_MODE.PEN) {
+            presenter.IWBDraw(presenter.$canvas, presenter.ctx, getCursorPosition(event));
+        } else if (presenter.drawMode === presenter.DRAW_MODE.ERASER) {
+            presenter.IWBDraw(presenter.$markerCanvas, presenter.markerCtx, getCursorPosition(event));
+            presenter.IWBDraw(presenter.$canvas, presenter.ctx, getCursorPosition(event));
+
+            var android_ver = MobileUtils.getAndroidVersion(window.navigator.userAgent);
+            if (["4.1.1", "4.1.2", "4.2.2", "4.3", "4.4.2"].indexOf(android_ver) !== -1) {
+                $('canvas').css('opacity', '0.99');
+
+                setTimeout(function() {
+                    $('canvas').css('opacity', '1');
+                }, 5);
+            }
+        }
+        presenter.lastMousePosition = getCursorPosition(event);
     };
 
-    presenter.penMouseUpHandler = function IWB_Toolbar_penMouseUpHandler(e) {
-        e.stopPropagation();
-        e.preventDefault();
-        if (presenter.isMouseDown) {
+    presenter.penPointerUpHandler = function IWB_Toolbar_penPointerUpHandler(event) {
+        event.stopPropagation();
+        event.preventDefault();
+        if (!isPrimaryEvent(event)) {
+            return;
+        }
+        if (presenter.isPointerDown) {
             presenter.penUsed = true;
         }
-        presenter.isMouseDown = false;
+        presenter.isPointerDown = false;
         setOverflowWorkAround(false);
-        presenter.penDataURL = presenter.canvas[0].toDataURL('image/png');
-        if (presenter.drawMode == presenter.DRAW_MODE.ERASER &amp;&amp; presenter.markerUsed) {
+        presenter.penDataURL = presenter.$canvas[0].toDataURL('image/png');
+        if (presenter.drawMode === presenter.DRAW_MODE.ERASER &amp;&amp; presenter.markerUsed) {
             saveMarkerDataUrl();
         }
 
@@ -1589,62 +1784,32 @@ canvas {
     };
 
     presenter.drawingLogic = function IWB_Toolbar_drawingLogic() {
-        if (MobileUtils.isEventSupported('touchstart')) {
-            presenter.iwb_tmp_canvas.removeEventListener('touchstart', presenter.onTouchStartCallback, false);
-            presenter.iwb_tmp_canvas.removeEventListener('touchend', presenter.onTouchEndEventCallback, false);
-        }else{
-            presenter.iwb_tmp_canvas.removeEventListener('mousemove', presenter.penMouseMoveHandler, false);
-            presenter.iwb_tmp_canvas.removeEventListener('mousedown', presenter.penMouseDownHandler, false);
-            presenter.iwb_tmp_canvas.removeEventListener('mouseup', presenter.penMouseUpHandler, false);
+        $(presenter.markerTmpCanvas).off();
+
+        let downEventName, moveEventName, upEventName;
+        if (presenter.isPointerEventSupported || !MobileUtils.isEventSupported('touchstart')) {
+            downEventName = getPointingDownEventName();
+            moveEventName = getPointingMoveEventName();
+            upEventName = getPointingUpEventName();
+        } else {
+            downEventName = "touchstart";
+            moveEventName = "touchmove";
+            upEventName = "touchend";
         }
 
-        $(presenter.canvas).off('mousedown mousemove mouseup touchstart touchmove touchend');
-        $(presenter.markerCanvas).off('mousedown mousemove mouseup touchstart touchmove touchend');
-
-        if (MobileUtils.isEventSupported('touchstart')) {
-            $(presenter.canvas).on('touchstart', function(e) {
-                presenter.penMouseDownHandler(e)
-            });
-            $(presenter.markerCanvas).on('touchstart', function(e) {
-                presenter.penMouseDownHandler(e)
-            });
-        }else{
-            $(presenter.canvas).on('mousedown', presenter.penMouseDownHandler);
-
-            $(presenter.markerCanvas).on('mousedown', presenter.penMouseDownHandler);
-        }
-
-        if (MobileUtils.isEventSupported('touchstart')) {
-            $(presenter.markerCanvas).on('touchmove', function(e) {
-                presenter.penMouseMoveHandler(e);
-            });
-
-            $(presenter.canvas).on('touchmove', function(e) {
-                presenter.penMouseMoveHandler(e);
-            });
-        }else{
-            $(presenter.markerCanvas).on('mousemove', presenter.penMouseMoveHandler);
-
-            $(presenter.canvas).on('mousemove', presenter.penMouseMoveHandler);
-        }
-
-        if (MobileUtils.isEventSupported('touchstart')) {
-            $(presenter.canvas).on('touchend', function(e) {
-                presenter.penMouseUpHandler(e);
-            });
-
-            $(presenter.markerCanvas).on('touchend', function(e) {
-                presenter.penMouseUpHandler(e);
-            });
-        }else{
-            $(presenter.canvas).on('mouseup', presenter.penMouseUpHandler);
-            $(presenter.markerCanvas).on('mouseup', presenter.penMouseUpHandler);
+        const canvases = [presenter.$canvas[0], presenter.$markerCanvas[0]];
+        for (let i = 0; i &lt; canvases.length; i++) {
+            canvases[i].addEventListener(downEventName, presenter.penPointerDownHandler, false);
+            canvases[i].addEventListener(moveEventName, presenter.penPointerMoveHandler, false);
+            canvases[i].addEventListener(upEventName, presenter.penPointerUpHandler, false);
         }
     };
 
     presenter.upgradeModel = function (model) {
         var upgradedModel = presenter.upgradeEnableUndoRedo(model);
-        upgradedModel = presenter.upgradeDefaultZoom(model);
+        upgradedModel = presenter.upgradeDefaultZoom(upgradedModel);
+        upgradedModel = presenter.upgradeExpansionDirection(upgradedModel);
+        upgradedModel = presenter.upgradePopupsDirection(upgradedModel);
         return upgradedModel;
     };
 
@@ -1656,22 +1821,47 @@ canvas {
             upgradedModel['enableUndoRedo'] = 'false';
         }
         return upgradedModel;
-    }
+    };
+
+    presenter.upgradeExpansionDirection = function (model) {
+        var upgradedModel = {};
+        $.extend(true, upgradedModel, model); // Deep copy of model object
+
+        if (!upgradedModel["expansionDirection"]) {
+            upgradedModel["expansionDirection"] = "right";
+        }
+        return upgradedModel;
+    };
+
+    presenter.upgradePopupsDirection = function (model) {
+        var upgradedModel = {};
+        $.extend(true, upgradedModel, model); // Deep copy of model object
+
+        if (!upgradedModel["verticalPopupDirection"]) {
+            upgradedModel["verticalPopupDirection"] = "right";
+        }
+
+        if (!upgradedModel["horizontalPopupDirection"]) {
+            upgradedModel["horizontalPopupDirection"] = "down";
+        }
+
+        return upgradedModel;
+    };
 
     presenter.upgradeDefaultZoom = function (model) {
-            var upgradedModel = {};
-            $.extend(true, upgradedModel, model); // Deep copy of model object
+        var upgradedModel = {};
+        $.extend(true, upgradedModel, model); // Deep copy of model object
 
-            if (!upgradedModel['disableModuleZoom']) {
-                upgradedModel['disableModuleZoom'] = 'false';
-            }
-
-            if (!upgradedModel['defaultZoom']) {
-                upgradedModel['defaultZoom'] = '';
-            }
-
-            return upgradedModel;
+        if (!upgradedModel['disableModuleZoom']) {
+            upgradedModel['disableModuleZoom'] = 'false';
         }
+
+        if (!upgradedModel['defaultZoom']) {
+            upgradedModel['defaultZoom'] = '';
+        }
+
+        return upgradedModel;
+    };
 
     presenter.setBasicConfiguration = function (view, model) {
         presenter.$view = $(view);
@@ -1709,6 +1899,8 @@ canvas {
         presenter.$bottomPanels = $('.bottom-panel-color, .bottom-panel-thickness, .bottom-panel-floating-image');
 
         presenter.config = validateModel(model);
+
+        presenter.$panel.addClass(presenter.model['expansionDirection']);
         presenter.stateStack = new StateStack(presenter);
     };
 
@@ -1781,8 +1973,14 @@ canvas {
             'onCustomButtonDeselected': model['hasCustomButton'] ? model['onCustomButtonDeselected'] : null,
             'enableUndoRedo': enableUndoRedo,
             'disableModuleZoom': disableModuleZoom,
-            'defaultZoom': defaultZoom
+            'defaultZoom': defaultZoom,
+            'expansionDirection': model['expansionDirection'],
+            'popupsDirection': presenter.isVerticalExpansion(model['expansionDirection']) ? model['verticalPopupDirection'] : model['horizontalPopupDirection']
         };
+    }
+
+    presenter.isVerticalExpansion = function (expansionDirection) {
+        return expansionDirection === 'up' || expansionDirection === 'down';
     }
 
     presenter.setImagePosition = function IWB_Toolbar_setImagePosition() {
@@ -1942,6 +2140,11 @@ canvas {
     };
 
     presenter.zoomClickHandler = function IWB_Toolbar_zoomClickHandler(button){
+        var $page = presenter.$pagePanel.find('.ic_page');
+        if ($page.hasClass("zoom-cursor-zoom-in") || $page.hasClass("zoom-zoomed-in")) {
+            return;
+        }
+
         var lastEvent = null;
 
         presenter.panelView(button);
@@ -1992,28 +2195,28 @@ canvas {
 
             var iwbCoverElements = $(".iwb-zoom-cover");
 
-            iwbCoverElements.on('click mousedown mouseup', function(e) {
+            iwbCoverElements.on(`click ${getPointingDownEventName()} ${getPointingUpEventName()}`, function(e) {
                 e.stopPropagation();
                 e.preventDefault();
             });
 
             presenter.modules.find('a').on('click', presenter.preventClickAction_zoomClickHandler);
 
-            iwbCoverElements.on('mousedown', function(e) {
+            iwbCoverElements.on(getPointingDownEventName(), function(e) {
                 e.stopPropagation();
                 e.preventDefault();
                 lastEvent = e;
-                presenter.isMouseDown= true;
+                presenter.isPointerDown = true;
                 presenter.mouse.x = e.clientX;
                 presenter.mouse.y = e.clientY;
             });
 
-            iwbCoverElements.on('mouseup', function(e) {
+            iwbCoverElements.on(getPointingUpEventName(), function(e) {
                 e.stopPropagation();
                 e.preventDefault();
-                presenter.isMouseDown = false;
+                presenter.isPointerDown = false;
 
-                if ((lastEvent.type == 'mousedown'|| lastEvent.type == 'mousemove') &amp;&amp;
+                if ((lastEvent.type == getPointingDownEventName()|| lastEvent.type == getPointingMoveEventName()) &amp;&amp;
                     !$(e.currentTarget).hasClass('iwb-toolbar-panel') &amp;&amp;
                     !$(e.currentTarget).hasClass('addon_IWB_Toolbar') &amp;&amp;
                     !$(e.currentTarget).hasClass('iwb-toolbar-note') &amp;&amp;
@@ -2027,8 +2230,8 @@ canvas {
                 lastEvent = e;
             });
 
-            iwbCoverElements.on('mousemove', function(e) {
-                if (presenter.isMouseDown) {
+            iwbCoverElements.on(getPointingMoveEventName(), function(e) {
+                if (presenter.isPointerDown) {
                     e.stopPropagation();
                     e.preventDefault();
                     var currentScrollX = $(window).scrollLeft(),
@@ -2080,7 +2283,9 @@ canvas {
         }
 
         presenter.$penMask.css('pointer-events', 'auto');
+        presenter.$penMask.css('touch-action', 'none');
         presenter.$markerMask.css('pointer-events', 'auto');
+        presenter.$markerMask.css('touch-action', 'none');
 
         presenter.changeColor('rgba(0, 0, 0, 1)');
         presenter.changeThickness(presenter.data.eraserThickness);
@@ -2093,7 +2298,9 @@ canvas {
         presenter.panelView(button);
 
         presenter.$penMask.css('pointer-events', 'none');
+        presenter.$penMask.css('touch-action', 'auto');
         presenter.$markerMask.css('pointer-events', 'none');
+        presenter.$markerMask.css('touch-action', 'auto');
     };
 
     presenter.hideAreaClickHandler = function IWB_Toolbar_hideAreaClickHandler(button) {
@@ -2174,10 +2381,10 @@ canvas {
         presenter.$pagePanel.find('.iwb-toolbar-note').click(function(e) {
             e.stopPropagation();
         });
-        presenter.$pagePanel.find('.note').on('mousedown', function() {
+        presenter.$pagePanel.find('.note').on(getPointingDownEventName(), function() {
             presenter.$pagePanel.find('.note').addClass('clicked');
         });
-        presenter.$pagePanel.find('.note').on('mouseup', function() {
+        presenter.$pagePanel.find('.note').on(getPointingUpEventName(), function() {
             presenter.$pagePanel.find('.note').removeClass('clicked');
         });
 
@@ -2213,13 +2420,17 @@ canvas {
     };
 
     presenter.floatingImageClickHandler = function IWB_Toolbar_floatingImageClickHandler(button) {
+        if (isJQueryObject(button) &amp;&amp; !isFloatingImageBtnVisible()) {
+            return;
+        }
+
         presenter.isZoomActive = false;
         presenter.restoreTextAudioEventHandlers();
 
         presenter.panelView(button);
         $.when.apply($, presenter.allImagesLoadedPromises).then(function() {
             var display = presenter.$pagePanel.find('.floating-image-mask').css('display');
-            if (display == 'none') {
+            if (display === 'none') {
                 presenter.$floatingImageMask.show();
                 presenter.$pagePanel.find('.bottom-panel-floating-image').show();
                 presenter.$pagePanel.find('.bottom-panel-floating-image').attr('isHidden', '1');
@@ -2233,15 +2444,23 @@ canvas {
         });
     };
 
+    function isJQueryObject(element) {
+        return !!element[0];
+    }
+
+    function isFloatingImageBtnVisible() {
+        return $('.floating-image').css('display') !== 'none';
+    }
+
     presenter.clockClickHandler = function IWB_Toolbar_clockClickHandler(button) {
         presenter.isZoomActive = false;
         presenter.restoreTextAudioEventHandlers();
 
         presenter.panelView(button);
-        presenter.$pagePanel.find('.clock').on('mousedown', function() {
+        presenter.$pagePanel.find('.clock').on(getPointingDownEventName(), function() {
             presenter.$pagePanel.find('.clock').addClass('clicked');
         });
-        presenter.$pagePanel.find('.clock').on('mouseup', function() {
+        presenter.$pagePanel.find('.clock').on(getPointingUpEventName(), function() {
             presenter.$pagePanel.find('.clock').removeClass('clicked');
         });
         presenter.createClock();
@@ -2253,10 +2472,10 @@ canvas {
         presenter.restoreTextAudioEventHandlers();
 
         presenter.panelView(button);
-        presenter.$pagePanel.find('.stopwatch').on('mousedown', function() {
+        presenter.$pagePanel.find('.stopwatch').on(getPointingDownEventName(), function() {
             presenter.$pagePanel.find('.stopwatch').addClass('clicked');
         });
-        presenter.$pagePanel.find('.stopwatch').on('mouseup', function() {
+        presenter.$pagePanel.find('.stopwatch').on(getPointingUpEventName(), function() {
             presenter.$pagePanel.find('.stopwatch').removeClass('clicked');
         });
         presenter.createStopwatch();
@@ -2283,7 +2502,7 @@ canvas {
 
         presenter.panelView(button);
         presenter.$panel.find('.clicked').removeClass('clicked');
-        presenter.closePanel();
+        presenter.closePanel(true);
         presenter.isPanelOpened = false;
         if(presenter.activeButton != 'open'){
             presenter.activeFunction = presenter.activeButton;
@@ -2350,10 +2569,14 @@ canvas {
                 if(!presenter.config.closedPanelDrawing) {
                     presenter.$penMask.css('pointer-events', 'none');
                     presenter.$markerMask.css('pointer-events', 'none');
+                    presenter.$penMask.css('touch-action', 'auto');
+                    presenter.$markerMask.css('touch-action', 'auto');
                 }
-            }else{
+            } else {
                 presenter.$penMask.css('pointer-events', 'auto');
                 presenter.$markerMask.css('pointer-events', 'auto');
+                presenter.$penMask.css('touch-action', 'none');
+                presenter.$markerMask.css('touch-action', 'none');
             }
         }
         changeCurrentFloatingImage(presenter.currentFloatingImageIndex);
@@ -2397,6 +2620,8 @@ canvas {
 
         presenter.$penMask.css('pointer-events', 'none');
         presenter.$markerMask.css('pointer-events', 'none');
+        presenter.$penMask.css('touch-action', 'auto');
+        presenter.$markerMask.css('touch-action', 'auto');
 
         presenter.penLineColor = presenter.currentLineColor;
         presenter.penLineWidth = presenter.currentLineWidth;
@@ -2417,6 +2642,8 @@ canvas {
 
         presenter.$penMask.css('pointer-events', 'none');
         presenter.$markerMask.css('pointer-events', 'none');
+        presenter.$penMask.css('touch-action', 'auto');
+        presenter.$markerMask.css('touch-action', 'auto');
 
         presenter.markerLineColor = presenter.currentLineColor;
         presenter.markerLineWidth = presenter.currentLineWidth;
@@ -2696,12 +2923,12 @@ canvas {
             getCurrentGroup().visible(true);
             presenter.floatingImageLayer.draw();
 
-            var isMouseDown = false,
+            var isPointerDown = false,
                 startingVector = null;
 
             function rotateActionStartHandler() {
                 if (presenter.floatingImageMode == presenter.FLOATING_IMAGE_MODE.ROTATE) {
-                    isMouseDown = true;
+                    isPointerDown = true;
                     var imageCenter = {
                         x: (getCurrentImage().getAbsolutePosition().x),
                         y: (getCurrentImage().getAbsolutePosition().y)
@@ -2711,17 +2938,17 @@ canvas {
                 }
             }
 
-            presenter.$floatingImageMask.off('mousedown touchstart mouseup touchend touchmove mousemove');
-            presenter.$floatingImageMask.on('mousedown', rotateActionStartHandler);
+            presenter.$floatingImageMask.off(`${getPointingDownEventName()} touchstart ${getPointingUpEventName()} touchend touchmove ${getPointingMoveEventName()}`);
+            presenter.$floatingImageMask.on(getPointingDownEventName(), rotateActionStartHandler);
             presenter.$floatingImageMask.on('touchstart', rotateActionStartHandler);
 
             function rotateActionEndHandler() {
                 if (presenter.floatingImageMode == presenter.FLOATING_IMAGE_MODE.ROTATE) {
-                    isMouseDown = false;
+                    isPointerDown = false;
                 }
             }
 
-            presenter.$floatingImageMask.on('mouseup', rotateActionEndHandler);
+            presenter.$floatingImageMask.on(getPointingUpEventName(), rotateActionEndHandler);
             presenter.$floatingImageMask.on('touchend', rotateActionEndHandler);
 
             var previousPosition = null;
@@ -2729,7 +2956,7 @@ canvas {
             function rotateActionMoveHandler() {
                 var currentPosition = presenter.floatingImageStage.getPointerPosition();
 
-                if (isMouseDown &amp;&amp; presenter.floatingImageMode == presenter.FLOATING_IMAGE_MODE.ROTATE &amp;&amp; previousPosition) {
+                if (isPointerDown &amp;&amp; presenter.floatingImageMode == presenter.FLOATING_IMAGE_MODE.ROTATE &amp;&amp; previousPosition) {
                     var imageCenter = {
                         x: (getCurrentImage().getAbsolutePosition().x),
                         y: (getCurrentImage().getAbsolutePosition().y)
@@ -2751,7 +2978,7 @@ canvas {
                 previousPosition = currentPosition;
             }
 
-            presenter.$floatingImageMask.on('mousemove', rotateActionMoveHandler);
+            presenter.$floatingImageMask.on(getPointingMoveEventName(), rotateActionMoveHandler);
             presenter.$floatingImageMask.on('touchmove', rotateActionMoveHandler);
         });
     }
@@ -2886,41 +3113,49 @@ canvas {
     };
 
     function addScrollHandler() {
-        var difference = 0,
-            lastScrollTop = 0,
-            panelTop = 0;
         if (!presenter.playerController || presenter.playerController.isPlayerInCrossDomain()) return;
-
+        var $defaultScrollElement = $(window.parent.document);
+        var $mCourserScrollElement = $defaultScrollElement.find('#lesson-view &gt; div &gt; div');
+        var $mAuthorMobileScrollElement = $(window);
+        var $mCourserMobileScrollElement = $("#content-view");
+        var scrollElements = [$defaultScrollElement, $mCourserScrollElement, $mAuthorMobileScrollElement, $mCourserMobileScrollElement];
         try {
-            $(window.parent.document).scroll(function () {
-                if (presenter.isOnScreen(presenter.$view.parent(), window)) {
-                    var containerHeight = presenter.$pagePanel.outerHeight(true),
-                        scrollTop = $(this).scrollTop(),
-                        min = presenter.$pagePanel.offset().top,
-                        headerHeight = $('.ic_header').outerHeight(true) - 20,
-                        max = containerHeight + headerHeight,
-                        zoomHeightScale = presenter.getZoomHeightScale();
-                    difference = scrollTop - lastScrollTop;
-
-                    panelTop = parseInt(presenter.$panel.css('top'), 10) + difference * zoomHeightScale;
-                    lastScrollTop = scrollTop;
-
-                    if (panelTop &amp;&amp; (panelTop) &gt; min &amp;&amp; (panelTop) &lt; max) {
-                        presenter.$panel.css({
-                            'top': (panelTop) + 'px'
-                        });
-                    } else if (panelTop &amp;&amp; (panelTop) &gt;= max) {
-                        presenter.$panel.css({
-                            'top': (containerHeight - presenter.$panel.outerHeight(true) + min) + 'px'
-                        });
-                    } else if (panelTop &amp;&amp; (panelTop) &lt;= min) {
-                        presenter.$panel.css({
-                            'top': min + 'px'
-                        });
-                    }
-                }
-            });
+            for (var i = 0; i &lt; scrollElements.length; i++) {
+                scrollElements[i].scroll(IWB_Toolbar_scrollHandler);
+            }
         } catch(e) {}
+    }
+
+    var difference = 0,
+        lastScrollTop = 0,
+        panelTop = 0;
+    function IWB_Toolbar_scrollHandler() {
+        if (presenter.isOnScreen(presenter.$view.parent(), window)) {
+            var containerHeight = presenter.$pagePanel.outerHeight(true),
+                scrollTop = $(this).scrollTop(),
+                baseHeightScale = presenter.playerController.getScaleInformation().scaleY,
+                min = presenter.$pagePanel.offset().top / baseHeightScale,
+                headerHeight = $('.ic_header').outerHeight(true) - 20,
+                max = (containerHeight + headerHeight) / baseHeightScale,
+                zoomHeightScale = presenter.getZoomHeightScale();
+            difference = scrollTop - lastScrollTop;
+            panelTop = parseInt(presenter.$panel.css('top'), 10) + difference * zoomHeightScale / baseHeightScale;
+            lastScrollTop = scrollTop;
+
+            if (panelTop &amp;&amp; (panelTop) &gt; min &amp;&amp; (panelTop) &lt; max) {
+                presenter.$panel.css({
+                    'top': (panelTop) + 'px'
+                });
+            } else if (panelTop &amp;&amp; (panelTop) &gt;= max) {
+                presenter.$panel.css({
+                    'top': (containerHeight - presenter.$panel.outerHeight(true) + min) + 'px'
+                });
+            } else if (panelTop &amp;&amp; (panelTop) &lt;= min) {
+                presenter.$panel.css({
+                    'top': min + 'px'
+                });
+            }
+        }
     }
 
     function drawSketch() {
@@ -2936,6 +3171,7 @@ canvas {
         iwb_tmp_canvas.height = canvas.height();
 
         var $tmpCanvas = $('#iwb_tmp_canvas');
+        sketch.css("touch-action", "none");
 
         if ($.contains(document, $tmpCanvas[0])) {
             $tmpCanvas.remove();
@@ -2980,17 +3216,17 @@ canvas {
                 tmp_ctx.clearRect(0, 0, iwb_tmp_canvas.width, iwb_tmp_canvas.height);
             }, false);
         }else{
-            iwb_tmp_canvas.addEventListener('mousemove', function(e) {
+            iwb_tmp_canvas.addEventListener(getPointingMoveEventName(), function(e) {
                 e.stopPropagation();
                 e.preventDefault();
                 mouse.x = typeof e.offsetX !== 'undefined' ?  e.offsetX : e.layerX;
                 mouse.y = typeof e.offsetY !== 'undefined' ? e.offsetY : e.layerY;
             }, false);
 
-            iwb_tmp_canvas.addEventListener('mousedown', function(e) {
+            iwb_tmp_canvas.addEventListener(getPointingDownEventName(), function(e) {
                 e.stopPropagation();
                 e.preventDefault();
-                iwb_tmp_canvas.addEventListener('mousemove', onPaint, false);
+                iwb_tmp_canvas.addEventListener(getPointingMoveEventName(), onPaint, false);
 
                 mouse.x = typeof e.offsetX !== 'undefined' ? e.offsetX : e.layerX;
                 mouse.y = typeof e.offsetY !== 'undefined' ? e.offsetY : e.layerY;
@@ -3000,10 +3236,10 @@ canvas {
                 onPaint();
             }, false);
 
-            iwb_tmp_canvas.addEventListener('mouseup', function(e) {
+            iwb_tmp_canvas.addEventListener(getPointingUpEventName(), function(e) {
                 e.stopPropagation();
                 e.preventDefault();
-                iwb_tmp_canvas.removeEventListener('mousemove', onPaint, false);
+                iwb_tmp_canvas.removeEventListener(getPointingMoveEventName(), onPaint, false);
                 // Writing down to real canvas now
                 // ctx.drawImage(iwb_tmp_canvas, 0, 0);
                 // Clearing tmp canvas
@@ -3072,14 +3308,13 @@ canvas {
             presenter.pushStateToStack();
         };
 
-        if( /Android|X11|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
-            presenter.$view.parent().find('.selecting').find('#iwb_tmp_canvas').on('touchstart', presenter.drawAreaLogic_touchStartCallback);
-
-            presenter.$view.parent().find('.selecting').find('#iwb_tmp_canvas').on('touchend', presenter.drawAreaLogic_touchEndCallback);
-        }else{
-            presenter.$view.parent().find('.selecting').find('#iwb_tmp_canvas').on('mousedown', presenter.drawAreaLogic_mouseDownCallback);
-
-            presenter.$view.parent().find('.selecting').find('#iwb_tmp_canvas').on('mouseup', presenter.drawAreaLogic_mouseUpCallback);
+        const $iwbTmpCanvas = presenter.$view.parent().find('.selecting').find('#iwb_tmp_canvas');
+        if ( /Android|X11|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ) {
+            $iwbTmpCanvas.on('touchstart', presenter.drawAreaLogic_touchStartCallback);
+            $iwbTmpCanvas.on('touchend', presenter.drawAreaLogic_touchEndCallback);
+        } else {
+            $iwbTmpCanvas.on(getPointingDownEventName(), presenter.drawAreaLogic_mouseDownCallback);
+            $iwbTmpCanvas.on(getPointingUpEventName(), presenter.drawAreaLogic_mouseUpCallback);
         }
     };
 
@@ -3090,8 +3325,6 @@ canvas {
         var pos = getCursorPosition(event.originalEvent);
         presenter.startSelection = getPoint(pos.x, pos.y);
     };
-
-
 
     presenter.drawAreaLogic_mouseDownCallback = function (event) {
         event.stopPropagation();
@@ -3210,8 +3443,8 @@ canvas {
                     opacity: 0.35,
                     create: function(event, _) {
                         $(event.target).css({
-                            'top' : savedStopwatch ? savedStopwatch.top : top,
-                            'left' : savedStopwatch ? savedStopwatch.left : presenter.$panel.css('left'),
+                            'top': presenter.getVerticalPosition(savedStopwatch, presenter.POPUP_TYPE.STOPWATCH),
+                            ...presenter.getHorizontalPosition(savedStopwatch, presenter.POPUP_TYPE.STOPWATCH),
                             'position' : 'absolute'
                         });
                     },
@@ -3312,6 +3545,131 @@ canvas {
         presenter.stopwatchAdded = true;
     };
 
+    presenter.getLeftValueVerticalPopups = function (popupType) {
+        const panelLeftValue = parseInt(presenter.$panel.css('left'), 10);
+        const toolbarWidth = parseInt(presenter.$panel.outerWidth(), 10);
+
+        return panelLeftValue + toolbarWidth + GAP_VALUE + presenter.getHorizontalOffset(popupType);
+    }
+
+    presenter.getLeftValueHorizontalPopups = function (popupType) {
+        const panelLeftValue = parseInt(presenter.$panel.css('left'), 10);
+        const offset = presenter.getHorizontalPopupOffset(popupType);
+
+        return panelLeftValue + offset;
+    }
+
+    presenter.getHorizontalPopupOffset = function (popupType) {
+        switch (popupType) {
+            case presenter.POPUP_TYPE.STOPWATCH:
+                return 0;
+
+            case presenter.POPUP_TYPE.CLOCK:
+                return presenter.getStopwatchWidth() + GAP_VALUE;
+
+            case presenter.POPUP_TYPE.NOTE:
+                return presenter.getStopwatchWidth() + GAP_VALUE
+                    + presenter.getClockWidth() + GAP_VALUE
+                    + presenter.notesCounter * GAP_VALUE;
+        }
+    }
+
+    presenter.getStopwatchWidth = function () {
+        const stopwatchWidth = $('.iwb-toolbar-stopwatch').outerWidth();
+        return stopwatchWidth ? stopwatchWidth : 180;
+    }
+
+    presenter.getClockWidth = function () {
+        const clockWidth = $('.iwb-toolbar-clock').outerWidth();
+        return clockWidth ? clockWidth : 100;
+    }
+
+    presenter.getRightValueVerticalPopups = function (popupType) {
+        const panelRightValue = parseInt(presenter.$panel.css('right'), 10);
+        const toolbarWidth = parseInt(presenter.$panel.outerWidth(), 10);
+
+        return panelRightValue + toolbarWidth + GAP_VALUE + presenter.getHorizontalOffset(popupType);
+    }
+
+    presenter.getTopValue = function (popupType) {
+        const panelTopValue = parseInt(presenter.$panel.css('top'), 10);
+        let offset;
+        if (presenter.config.popupsDirection === 'left' || presenter.config.popupsDirection === 'right') {
+            offset = presenter.getVerticalOffset(popupType);
+        } else if (presenter.config.popupsDirection === 'down') {
+            const toolbarHeight = parseInt(presenter.$panel.outerHeight(), 10);
+            const noteOffset = popupType === presenter.POPUP_TYPE.NOTE ? presenter.notesCounter * GAP_VALUE : 0;
+            offset = toolbarHeight + GAP_VALUE + noteOffset;
+        } else if (presenter.config.popupsDirection === 'up') {
+            const noteOffset = popupType === presenter.POPUP_TYPE.NOTE ? presenter.notesCounter * GAP_VALUE : 0;
+            offset = -(presenter.getPopupHeight(popupType) + GAP_VALUE + noteOffset);
+        }
+
+        return panelTopValue + offset;
+    }
+
+    presenter.getPopupHeight = function (popupType) {
+        switch (popupType) {
+            case presenter.POPUP_TYPE.STOPWATCH:
+                return STOPWATCH_OFFSET;
+
+            case presenter.POPUP_TYPE.CLOCK:
+                return CLOCK_OFFSET - 8;
+
+            case presenter.POPUP_TYPE.NOTE:
+                return NOTE_OFFSET;
+        }
+    }
+
+    presenter.getVerticalOffset = function (popupType) {
+        switch (popupType) {
+            case presenter.POPUP_TYPE.STOPWATCH:
+                return 0;
+
+            case presenter.POPUP_TYPE.CLOCK:
+                return CLOCK_OFFSET + GAP_VALUE;
+
+            case presenter.POPUP_TYPE.NOTE:
+                return NOTE_OFFSET + GAP_VALUE + presenter.notesCounter * GAP_VALUE;
+        }
+    }
+
+    presenter.getHorizontalOffset = function (popupType) {
+        switch (popupType) {
+            case presenter.POPUP_TYPE.CLOCK:
+            case presenter.POPUP_TYPE.STOPWATCH:
+                return 0;
+
+            case presenter.POPUP_TYPE.NOTE:
+                return presenter.notesCounter * GAP_VALUE;
+        }
+    }
+
+    presenter.getVerticalPosition = function (savedElement, popupType) {
+        if (savedElement) {
+            return savedElement.top
+        }
+
+        return presenter.getTopValue(popupType)
+    }
+
+    presenter.getHorizontalPosition = function (savedElement, popupType) {
+        if (savedElement) {
+            return {'left' : savedElement.left}
+        }
+        switch (presenter.config.popupsDirection) {
+            case 'down':
+            case 'up':
+                return {'left': presenter.getLeftValueHorizontalPopups(popupType)};
+
+            case 'right':
+                return {'left': presenter.getLeftValueVerticalPopups(popupType)};
+
+            case 'left':
+               return {'right': presenter.getRightValueVerticalPopups(popupType)};
+        }
+    }
+
     function closeClock() {
         presenter._clockwatch.clock.remove();
         presenter.$panel.find('.clock.clicked').removeClass('clicked');
@@ -3363,8 +3721,8 @@ canvas {
                 opacity: 0.35,
                 create: function(event, _) {
                     $(event.target).css({
-                        'top' : savedClock ? savedClock.top : top,
-                        'left' : savedClock ? savedClock.left : presenter.$panel.css('left'),
+                        'top': presenter.getVerticalPosition(savedClock, presenter.POPUP_TYPE.CLOCK),
+                        ...presenter.getHorizontalPosition(savedClock, presenter.POPUP_TYPE.CLOCK),
                         'position' : 'absolute'
                     });
                 },
@@ -3463,7 +3821,8 @@ canvas {
             this.$note.off('dblclick');
         }.bind(this));
 
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        const foundTouchPoints = (navigator.maxTouchPoints &gt; 0 || navigator.msMaxTouchPoints &gt; 0);
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || foundTouchPoints) {
             window.EventsUtils.DoubleTap.on(this.$note, function () {
                 this.noteEditHandler();
                 window.EventsUtils.DoubleTap.off(this.$note);
@@ -3575,8 +3934,8 @@ canvas {
             opacity: 0.35,
             create: function(event, _) {
                 $(event.target).css({
-                    'top' : savedNote ? savedNote.top : top,
-                    'left' : savedNote ? savedNote.left : presenter.$panel.css('left'),
+                    'top': presenter.getVerticalPosition(savedNote, presenter.POPUP_TYPE.NOTE),
+                    ...presenter.getHorizontalPosition(savedNote, presenter.POPUP_TYPE.NOTE),
                     'position' : 'absolute'
                 });
             },
@@ -3586,6 +3945,7 @@ canvas {
                 presenter.pushStateToStack();
             }
         });
+        presenter.notesCounter += 1;
     };
 
     presenter.Note.prototype.destroy = function () {
@@ -3615,9 +3975,11 @@ canvas {
             this.$noteBody = null;
             this.$textarea = null;
             this.$buttonSave = null;
+
+            presenter.notesCounter -= 1;
         }
     };
-    
+
     presenter.Note.prototype.getState = function () {
         return {
             'top': this.$note.css('top'),
@@ -3630,12 +3992,12 @@ canvas {
     presenter.Note.createNote = function (savedNote) {
         var note = new presenter.Note();
         note.init(savedNote);
-        
+
         if (savedNote) {
             note.setDate(savedNote.date);
             note.setBody(savedNote.body);
         }
-        
+
         return note;
     };
 
@@ -3813,7 +4175,7 @@ canvas {
                 presenter.markerCtx = ctx;
             },
             function(canvas) {
-                presenter.markerCanvas = canvas;
+                presenter.$markerCanvas = canvas;
             }
         );
 
@@ -3827,7 +4189,7 @@ canvas {
                 presenter.ctx = ctx;
             },
             function(canvas) {
-                presenter.canvas = canvas;
+                presenter.$canvas = canvas;
             }
         );
 
@@ -3883,6 +4245,7 @@ canvas {
         presenter.isKeepStateAndPosition = ModelValidationUtils.validateBoolean(model['keepStateAndPosition']);
 
         $(view).find('.iwb-toolbar-panel').width(model['Width'] - 50 + 'px');
+        $(view).find('.iwb-toolbar-panel').addClass(presenter.model['expansionDirection']);
 
         var moduleClasses = $(view).attr('class');
 
@@ -3923,9 +4286,9 @@ canvas {
 
         presenter.createCanvases();
 
-        presenter.iwb_tmp_canvas = document.createElement('canvas');
-        presenter.tmp_ctx = presenter.iwb_tmp_canvas.getContext('2d');
-        $(presenter.iwb_tmp_canvas).addClass('iwb_tmp_canvas');
+        presenter.markerTmpCanvas = document.createElement('canvas');
+        presenter.markerTmpCtx = presenter.markerTmpCanvas.getContext('2d');
+        presenter.markerTmpCanvas.classList.add('iwb_tmp_canvas');
 
         presenter.$panel.draggable({
             containment: 'parent',
@@ -3997,7 +4360,17 @@ canvas {
 
 
         presenter.applyHovered([presenter.$panel.find('.button')]);
-        presenter.$panel.width(presenter.config.widthWhenClosed - 50 + 'px');
+
+        var newWidthWhenClosed = presenter.config.widthWhenClosed - 50;
+        presenter.trueClosedPanelSize = {
+            width: newWidthWhenClosed &lt; 0 ? presenter.$panel.width() : newWidthWhenClosed,
+            height: presenter.$panel.height()
+        }
+        if (presenter.config.expansionDirection == "left" || presenter.config.expansionDirection == "right") {
+            presenter.$panel.width(presenter.trueClosedPanelSize.width + 'px');
+        } else {
+            presenter.$panel.css("min-width", presenter.trueClosedPanelSize.width + 'px');
+        }
 
         window.savedPanel = window.savedPanel || {};
 
@@ -4010,7 +4383,7 @@ canvas {
         presenter.addEventHandlers();
 
 
-        if (presenter.isInFrame &amp;&amp; presenter.config.panelPosition == 'fixed') {
+        if ((presenter.isInFrame || MobileUtils.isMobileUserAgent(navigator.userAgent)) &amp;&amp; presenter.config.panelPosition == 'fixed') {
             addScrollHandler();
         }
 
@@ -4019,9 +4392,10 @@ canvas {
 
         var width = presenter.$pagePanel.find('.marker-mask').find('canvas')[0].width;
         var height = presenter.$pagePanel.find('.marker-mask').find('canvas')[0].height;
-        presenter.iwb_tmp_canvas.width = width;
-        presenter.iwb_tmp_canvas.height = height;
-        presenter.$pagePanel.find('.marker-mask').append(presenter.iwb_tmp_canvas);
+
+        presenter.markerTmpCanvas.width = width;
+        presenter.markerTmpCanvas.height = height;
+        presenter.$pagePanel.find('.marker-mask').append(presenter.markerTmpCanvas);
 
         /**
          * We're adding addon class to its panel as a way of ensuring custom class styling applies.
@@ -4078,6 +4452,11 @@ canvas {
     };
 
     presenter.onDestroy = function () {
+        var isOpenPanel = window.savedPanel.isOpen;
+        if (isOpenPanel) {
+            presenter.closePanel(false);
+            window.savedPanel.isOpen = true;
+        }
         clearCanvases();
 
         presenter.points = [];
@@ -4164,15 +4543,9 @@ canvas {
         presenter.buttonsLogic = null;
         presenter.recklick = null;
 
-        //penClickHandler
-        presenter.iwb_tmp_canvas.removeEventListener('touchstart', presenter.onTouchStartCallback, false);
-        presenter.iwb_tmp_canvas.removeEventListener('touchend', presenter.onTouchEndEventCallback, false);
-        presenter.iwb_tmp_canvas.removeEventListener('mousemove', presenter.penMouseMoveHandler, false);
-        presenter.iwb_tmp_canvas.removeEventListener('mousedown', presenter.penMouseDownHandler, false);
-        presenter.iwb_tmp_canvas.removeEventListener('mouseup', presenter.penMouseUpHandler, false);
-
-        $(presenter.canvas).off('mousedown mousemove mouseup touchstart touchmove touchend');
-        $(presenter.markerCanvas).off('mousedown mousemove mouseup touchstart touchmove touchend');
+        $(presenter.markerTmpCanvas).off();
+        presenter.$canvas.off(`${getPointingDownEventName()} ${getPointingMoveEventName()} ${getPointingUpEventName()} touchstart touchmove touchend`);
+        presenter.$markerCanvas.off(`${getPointingDownEventName()} ${getPointingMoveEventName()} ${getPointingUpEventName()} touchstart touchmove touchend`);
 
         presenter.isZoomActive = null;
         presenter.$defaultColorButton = null;
@@ -4195,20 +4568,11 @@ canvas {
         presenter.colorBackground = null;
         presenter.penClicked = null;
 
-        //markerClicked
-        presenter.iwb_tmp_canvas.removeEventListener('touchstart', presenter.onTouchStartCallback);
-        presenter.iwb_tmp_canvas.removeEventListener('touchend', presenter.onTouchEndEventCallback);
-        // MOUSE
-        presenter.iwb_tmp_canvas.removeEventListener('mousemove', presenter.markerMouseMoveHandler);
-        presenter.iwb_tmp_canvas.removeEventListener('mousedown', presenter.markerMouseDownHandler);
-        presenter.iwb_tmp_canvas.removeEventListener('mouseup', presenter.markerMouseUpHandler);
-        $(presenter.iwb_tmp_canvas).off();
-        
         presenter.markerColorBackground = null;
         presenter.markerThicknessBackground = null;
         presenter.markerCtx = null;
         presenter.markerClicked = null;
-        presenter.iwb_tmp_canvas = null;
+        presenter.markerTmpCanvas = null;
 
         //markerCloseHandler
         presenter.markerLineColor = null;
@@ -4236,7 +4600,7 @@ canvas {
             $(element).unbind('click', preventClickActionTextAudio);
         });
         presenter.areZoomEventHandlersAttached = null;
-        presenter.isMouseDown = null;
+        presenter.isPointerDown = null;
 
         //eraserClickHandler
         presenter.ctx = null;
@@ -4280,7 +4644,6 @@ canvas {
         presenter.isCloseColor = null;
         presenter.shouldSaveColor = null;
         presenter.closePenColor = null;
-        presenter.currentLineColor = null;
         presenter.closePenThickness = null;
         presenter.currentMarkerThickness = null;
         presenter.isCloseColor = null;
@@ -4343,11 +4706,11 @@ canvas {
         presenter.tmp_ctx = null;
 
         presenter.$markerMask = null;
-        presenter.markerCanvas = null;
+        presenter.$markerCanvas = null;
         presenter.markerCtx = null;
         presenter.$penMask = null;
         presenter.ctx = null;
-        presenter.canvas = null;
+        presenter.$canvas = null;
         presenter.$selectingMask = null;
         presenter.selectingCtx = null;
         presenter.selectingCanvas = null;
@@ -4365,25 +4728,25 @@ canvas {
         if(presenter.floatingImageStage) {
             presenter.floatingImageStage.destroy();
         }
-        
+
         for(var i = 0; i &lt; 3; i++) {
             if(presenter._kinetic.images[i]) {
                 presenter._kinetic.images[i].destroy();
             }
-        
+
             //imageRotateObj
             if(presenter._kinetic.rotateObj[i]) {
                 $(presenter._kinetic.rotateObj[i]).off();
                 presenter._kinetic.rotateObj[i].src = '';
             }
-        
+
             //imageMoveObj
             if(presenter._kinetic.moveObj[i]) {
                 $(presenter._kinetic.moveObj[i]).off();
                 presenter._kinetic.moveObj[i].src = '';
             }
-        
-        
+
+
             //imageObj
             if(presenter._kinetic.imageObj[i]) {
                 $(presenter._kinetic.imageObj[i]).off();
@@ -4443,13 +4806,16 @@ canvas {
          * **************************************************
          */
          if (presenter.playerController &amp;&amp; !presenter.playerController.isPlayerInCrossDomain()) {
-             $(window.parent.document).unbind('scroll');
+             $(window.parent.document).unbind('scroll', IWB_Toolbar_scrollHandler);
+             $(window.parent.document).find('#lesson-view &gt; div &gt; div').unbind('scroll', IWB_Toolbar_scrollHandler);
+             $(window).unbind('scroll', IWB_Toolbar_scrollHandler);
+             $("#content-view").unbind('scroll', IWB_Toolbar_scrollHandler);
          }
 
         /***
-         * ************************************************ 
+         * ************************************************
          * zoom
-         * ************************************************ 
+         * ************************************************
          */
         if(zoom) {
             zoom.destroy();
@@ -4486,6 +4852,7 @@ canvas {
         presenter.setVisibility = null;
         presenter.openPanel = null;
         presenter._openPanelShow = null;
+        presenter._closePanelShow = null;
         presenter.toogleMasks = null;
         presenter.isSupportCSSPointerEvents = null;
         presenter.panelView = null;
@@ -4535,14 +4902,14 @@ canvas {
         //markerDrawingLogicFunctions
         presenter.onTouchStartCallback = null;
         presenter.onTouchEndEventCallback = null;
-        presenter.markerMouseMoveHandler = null;
-        presenter.markerMouseDownHandler = null;
-        presenter.markerMouseUpHandler = null;
+        presenter.markerPointerMoveHandler = null;
+        presenter.markerPointerDownHandler = null;
+        presenter.markerPointerUpHandler = null;
 
         //penDrawingLogicFunctions
-        presenter.penMouseMoveHandler = null;
-        presenter.penMouseDownHandler = null;
-        presenter.penMouseUpHandler = null;
+        presenter.penPointerMoveHandler = null;
+        presenter.penPointerDownHandler = null;
+        presenter.penPointerUpHandler = null;
 
         //hideArea
         presenter.drawAreaLogic_touchStartCallback = null;
@@ -4632,22 +4999,22 @@ canvas {
     };
 
     function clearCanvases() {
-        if (presenter.canvas) {
+        if (presenter.$canvas) {
             presenter.penUsed = false;
-            presenter.canvas.off('mousemove mousedown mouseup');
-            presenter.ctx.clearRect(0, 0, presenter.canvas[0].width, presenter.canvas[0].height);
+            presenter.$canvas.off(`${getPointingMoveEventName()} ${getPointingDownEventName()} ${getPointingUpEventName()}`);
+            presenter.ctx.clearRect(0, 0, presenter.$canvas[0].width, presenter.$canvas[0].height);
         }
 
-        if (presenter.markerCanvas) {
+        if (presenter.$markerCanvas) {
             presenter.markerUsed = false;
-            presenter.markerCanvas.off('mousemove mousedown mouseup');
-            presenter.markerCtx.clearRect(0, 0, presenter.markerCanvas[0].width, presenter.markerCanvas[0].height);
+            presenter.$markerCanvas.off(`${getPointingMoveEventName()} ${getPointingDownEventName()} ${getPointingUpEventName()}`);
+            presenter.markerCtx.clearRect(0, 0, presenter.$markerCanvas[0].width, presenter.$markerCanvas[0].height);
         }
     }
 
     function clearSelectingCanvas() {
         if (presenter.selectingCanvas) {
-            presenter.selectingCanvas.off('mousemove mousedown mouseup');
+            presenter.selectingCanvas.off(`${getPointingMoveEventName()} ${getPointingDownEventName()} ${getPointingUpEventName()}`);
             presenter.selectingCtx.clearRect(0, 0, presenter.selectingCanvas[0].width, presenter.selectingCanvas[0].height);
         }
     }
@@ -4740,10 +5107,9 @@ canvas {
            position = presenter.$panel.position(),
            openedPanel = isPanelOpened(),
            drawings = {
-               'pen' : (presenter.penUsed &amp;&amp; presenter.canvas) ? presenter.penDataURL : null,
-               'marker' : (presenter.markerUsed &amp;&amp; presenter.markerCanvas) ? presenter.markerDataUrl : null
+               'pen' : (presenter.penUsed &amp;&amp; presenter.$canvas) ? presenter.penDataURL : null,
+               'marker' : (presenter.markerUsed &amp;&amp; presenter.$markerCanvas) ? presenter.markerDataUrl : null
            };
-
 
         var stateColor;
         var stateThickness;
@@ -4910,22 +5276,19 @@ canvas {
             return false;
         }
 
-        return keepStateAndPosition == 'False';
+        return keepStateAndPosition === 'True';
     };
 
     presenter.setState = function(state) {
         if (!state) {
            return;
         }
-
         var parsedState = JSON.parse(state);
 
         var upgradedState = presenter.upgradeState(parsedState);
-
         presenter.areas = parsedState.areas;
         presenter.stopwatches = parsedState.stopwatches;
         presenter.clocks = parsedState.clocks;
-        
         if (presenter.shouldRestoreStateAndPosition(presenter.model, upgradedState)) {
            if (upgradedState.openedPanel) {
                if(presenter.isKeepStateAndPosition){
@@ -4933,11 +5296,11 @@ canvas {
                }
            }
            presenter.position = upgradedState.position;
-        
+
            var visibility = presenter.$panel.css('visibility');
            var width = presenter.$panel.css('width');
            var position = presenter.$panel.css('position');
-        
+
            presenter.$panel.attr('style', 'position: ' + position + '; top: ' + presenter.position.top + 'px; left: ' + presenter.position.left + 'px; visibility: ' + visibility + '; width: ' + width + ';');
         }
 
@@ -4958,7 +5321,7 @@ canvas {
         presenter.markerDataUrl = upgradedState.drawings.marker;
         setDrawingState(new Image(), presenter.ctx, upgradedState.drawings.pen);
         setDrawingState(new Image(), presenter.markerCtx, upgradedState.drawings.marker);
-        
+
         $.each(parsedState.notes, function(_, noteData) {
             var note = presenter.createNote(noteData);
             presenter.noteObjects.push(note);
@@ -4972,38 +5335,31 @@ canvas {
         $.each(presenter.stopwatches, function() {
            presenter.createStopwatch(this, upgradedState.hours, upgradedState.minutes, upgradedState.seconds, upgradedState.stopClicked, upgradedState.startClicked);
         });
-        
+
         drawSavedAreas();
         presenter.isVisible = upgradedState.isVisible;
         presenter.setVisibility(presenter.isVisible, false, presenter.$view);
-        
+
         if (presenter.isSupportCSSPointerEvents()) {
            presenter.$penMask.show();
            presenter.$markerMask.show();
-           if(presenter.isKeepStateAndPosition){
-               if(window.savedPanel.tools != undefined){
-                   if(window.savedPanel.tools.activeFunction == 'pen' || window.savedPanel.tools.activeFunction == 'marker'){
-                       if(window.savedPanel.isOpen){
-                           presenter.$penMask.css('pointer-events', 'auto');
-                           presenter.$markerMask.css('pointer-events', 'auto');
-                       }else{
-                           presenter.$penMask.css('pointer-events', 'none');
-                           presenter.$markerMask.css('pointer-events', 'none');
-                       }
-                   }else{
-                       presenter.$penMask.css('pointer-events', 'none');
-                       presenter.$markerMask.css('pointer-events', 'none');
-                   }
-               }else{
-                   presenter.$penMask.css('pointer-events', 'none');
-                   presenter.$markerMask.css('pointer-events', 'none');
-               }
-           }else{
+           if (presenter.isKeepStateAndPosition
+               &amp;&amp; window.savedPanel.tools != undefined
+               &amp;&amp; (window.savedPanel.tools.activeFunction == 'pen' || window.savedPanel.tools.activeFunction == 'marker')
+               &amp;&amp; window.savedPanel.isOpen)
+           {
+               presenter.$penMask.css('pointer-events', 'auto');
+               presenter.$markerMask.css('pointer-events', 'auto');
+               presenter.$penMask.css('touch-action', 'none');
+               presenter.$markerMask.css('touch-action', 'none');
+           } else {
                presenter.$penMask.css('pointer-events', 'none');
                presenter.$markerMask.css('pointer-events', 'none');
+               presenter.$penMask.css('touch-action', 'auto');
+               presenter.$markerMask.css('touch-action', 'auto');
            }
         }
-        
+
         if(presenter.isKeepStateAndPosition &amp;&amp; (window.savedPanel.tools != undefined)){
            presenter.customButtonActive = window.savedPanel.tools.customButtonActive;
            presenter.activeFunction = window.savedPanel.tools.activeFunction;
@@ -5041,7 +5397,7 @@ canvas {
         } else {
             presenter.$selectingMask.hide();
         }
-        
+
         setOverflowWorkAround(true);
         setOverflowWorkAround(false);
     };
@@ -5112,6 +5468,8 @@ canvas {
         presenter.markerCtx.globalCompositeOperation = 'source-over';
         presenter.$penMask.css('pointer-events', 'none');
         presenter.$markerMask.css('pointer-events', 'none');
+        presenter.$penMask.css('touch-action', 'auto');
+        presenter.$markerMask.css('touch-action', 'auto');
     }
 
     presenter.restoreLastState = function() {
@@ -5245,6 +5603,30 @@ canvas {
             var pageIndex = this.iwbPresenter.playerController.getCurrentPageIndex();
             window.savedPanel.histories[pageIndex] = this.getState();
         }
+    }
+
+    function getPointingDownEventName() {
+        return getPointingEventName("down");
+    }
+
+    function getPointingUpEventName() {
+        return getPointingEventName("up");
+    }
+
+    function getPointingMoveEventName() {
+        return getPointingEventName("move");
+    }
+
+    function getPointingEventName(type) {
+        return (presenter.isPointerEventSupported ? "pointer" : "mouse") + type;
+    }
+
+    function isPrimaryEvent(event) {
+        if (!presenter.isPointerEventSupported) {
+            // Not pointer events treat as primary events
+            return true;
+        }
+        return !!(event.originalEvent ? event.originalEvent.isPrimary : event.isPrimary);
     }
 
     return presenter;

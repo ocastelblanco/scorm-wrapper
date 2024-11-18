@@ -217,7 +217,8 @@
 
         presenter.setVisibility(presenter.configuration.isVisibleByDefault || isPreview);
 
-        view.addEventListener('DOMNodeRemoved', presenter.destroy);
+        MutationObserverService.createDestroyObserver(presenter.configuration.addonID, presenter.destroy, presenter.state.view);
+        MutationObserverService.setObserver();
     };
 
     presenter.connectHandlers = function () {
@@ -463,10 +464,6 @@
     };
 
     presenter.destroy = function () {
-        if (event.target !== this) {
-            return;
-        }
-
         presenter.state.destoyed = true;
 
         for (var i = 0; i &lt; presenter.state.levels.length; i++) {
@@ -474,7 +471,6 @@
         }
 
         presenter.state.$playButton.off();
-        presenter.state.view.removeEventListener('DOMNodeRemoved', presenter.destroy);
     };
 
     presenter.validateModel = function (model) {

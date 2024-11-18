@@ -51,12 +51,17 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
           userAgent.match(/IEMobile/i) ||
           userAgent.match(/Opera Mini/i);
         
-        if (mobile_agent) {
+        if (mobile_agent || ScreenUtils.isIpadAsDesktop(userAgent)) {
             return true;
         } else {
             return false;
         }
     };
+
+     ScreenUtils.isIpadAsDesktop = function (userAgent) {
+         return userAgent.match(/Macintosh/i) && 'ontouchend' in document;
+     }
+
     
     ScreenUtils.isSamsungBrowser = function (userAgent) {
         if (userAgent === undefined || !userAgent) {

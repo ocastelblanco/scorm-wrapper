@@ -141,7 +141,7 @@
     
     presenter.onEventReceived = function(eventName, eventData) {
         if (eventName == "ValueChanged") {
-            if (eventData.value == 'dropdownClicked') {
+            if (eventData.value == 'dropdownClicked' &amp;&amp; !presenter.audio.playing &amp;&amp; !isTemporarilyPaused()) {
                 this.audio.load();
             }
         }else if (eventName == "ItemConsumed") {
@@ -176,6 +176,14 @@
             this.applySelectedClass(itemID);
         }
     };
+
+    function isTemporarilyPaused() {
+        return (presenter.audio.paused
+            &amp;&amp; presenter.audio.readyState &gt; 2
+            &amp;&amp; presenter.audio.currentTime &gt; 0
+            &amp;&amp; !presenter.audio.ended
+        );
+    }
 
     function getItemIdFromEvent(eventDataItem) {
         var addonAndItemIds = eventDataItem.split('-');
@@ -221,6 +229,10 @@
     
     presenter.createOnPlayingEventData = function (data) {
         return getEventObject(data.currentItem, 'playing', '');
+    };
+
+    presenter.createOnPauseEventData = function (data) {
+        return getEventObject(data.currentItem, 'pause', '');
     };
     
     presenter.sendEventAndSetCurrentTimeAlreadySent = function (eventData, currentTime) {
@@ -285,6 +297,12 @@
             eventBus.sendEvent('ValueChanged', eventData);
     };
 
+    presenter.sendOnPausedEvent = function () {
+        var currentItem = presenter.currentAudio+1;
+        var eventData = presenter.createOnPauseEventData({'currentItem': currentItem});
+            eventBus.sendEvent('ValueChanged', eventData);
+    };
+
     presenter.playingEventSent = false;
     presenter.createView = function(view, model){
         var interfaceType = model["Interface"];
@@ -329,6 +347,12 @@
             presenter.playingEventSent = false;
         }, false);
 
+        this.audio.addEventListener('pause', function() {
+                if (interfaceType == "Default controls") {
+                    presenter.sendOnPausedEvent();
+                }
+            }, false);
+
         if (!presenter.isLoaded) {
             this.audio.addEventListener("loadeddata", function() {
                 presenter.isLoaded = true;
@@ -350,6 +374,12 @@
                 presenter.createDraggableItems(model['Files']);
                 break;
         }
+
+        Object.defineProperty(presenter.audio, 'playing', {
+            get: function () {
+                return !!(this.currentTime &gt; 0 &amp;&amp; !this.paused &amp;&amp; !this.ended &amp;&amp; this.readyState &gt; 2);
+            }
+        });
     };
 
     presenter.createDraggableItems = function(filesModel) {
@@ -421,15 +451,23 @@
     }
 
     function getScale() {
-        var $content = $("#content");
-        if($content.size() &gt; 0) {
-            var contentElem = $content[0];
-            var scaleX = contentElem.getBoundingClientRect().width / contentElem.offsetWidth;
-            var scaleY = contentElem.getBoundingClientRect().height / contentElem.offsetHeight;
+        if (presenter.playerController) {
+            const scaleInformation = presenter.playerController.getScaleInformation();
+            if (scaleInformation.baseScaleX !== 1.0 ||
+                scaleInformation.baseScaleY !== 1.0 ||
+                scaleInformation.scaleX !== 1.0 ||
+                scaleInformation.scaleY !== 1.0
+            ) {
+                return {X: scaleInformation.scaleX, Y: scaleInformation.scaleY};
+            }
+        }
+
+        const $content = $("#content");
+        if ($content.size() &gt; 0) {
+            const contentElem = $content[0];
+            const scaleX = contentElem.getBoundingClientRect().width / contentElem.offsetWidth;
+            const scaleY = contentElem.getBoundingClientRect().height / contentElem.offsetHeight;
             return {X: scaleX, Y: scaleY};
-        } else if (presenter.playerController) {
-            var scale = presenter.playerController.getScaleInformation();
-            return {X: scale.scaleX, Y: scale.scaleY};
         } else {
             return {X: 1.0, Y: 1.0};
         }
@@ -674,20 +712,17 @@
         this.speechTexts = presenter.getSpeechTexts(upgradedModel['speechTexts']);
         this.globalView = $(view);
         this.createView(view, upgradedModel);
+        presenter.view = view;
         if (!isPreview) {
         	this.loadFiles(this.audio, upgradedModel);
+            MutationObserverService.createDestroyObserver(presenter.addonID, presenter.destroy, presenter.view);
+            MutationObserverService.setObserver();
         }
         this.visible = !!(upgradedModel['Is Visible'] == 'True');
         this.defaultVisibility = this.visible;
-
-        presenter.view = view;
-
-        presenter.view.addEventListener('DOMNodeRemoved', presenter.destroy);
     };
 
     presenter.destroy = function AddonMultiAudio_destroy() {
-        presenter.view.removeEventListener('DOMNodeRemoved', presenter.destroy);
-
         presenter.audio.pause();
     };
 
@@ -736,6 +771,7 @@
         if (!presenter.audio.paused) {
             presenter.audio.pause();
             presenter.playingEventSent = false;
+            presenter.sendOnPausedEvent();
         }
 
         presenter.audio.currentTime = 0;
@@ -752,6 +788,7 @@
         if (!presenter.audio.paused) {
             presenter.audio.pause();
             presenter.playingEventSent = false;
+            presenter.sendOnPausedEvent();
         }
         presenter.stopDraggableItems();
     };
@@ -836,6 +873,7 @@
     presenter.jumpTo = function(audioNumber) {
         var newAudio = parseInt(audioNumber, 10) - 1;
         if (0 &lt;= newAudio &amp;&amp; newAudio &lt; this.files.length) {
+            presenter.sendOnPausedEvent();
             this.currentAudio = newAudio;
             presenter.isLoaded = false;
             presenter.loadFiles(this.audio, this.globalModel);
@@ -849,6 +887,7 @@
 
     presenter.previous = function() {
         if (this.currentAudio &gt; 0) {
+            presenter.sendOnPausedEvent();
             this.currentAudio--;
             this.initialize(this.globalView[0], this.globalModel);
         }
@@ -856,6 +895,7 @@
 
     presenter.next = function() {
         if (this.currentAudio &lt; this.files.length - 1) {
+            presenter.sendOnPausedEvent();
             this.currentAudio++;
             this.initialize(this.globalView[0], this.globalModel);
         }

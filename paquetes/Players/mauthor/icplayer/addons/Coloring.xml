@@ -1276,6 +1276,8 @@
     };
 
     presenter.getState = function(){
+        const wasAnswersShow = presenter.isShowAnswersActive;
+        const lastAreaIdInGSAMode = presenter.currentAreaIdInGSAMode;
 
         if (!presenter.isCanvasInitiated &amp;&amp; presenter.initialState != null) {
             return presenter.initialState;
@@ -1317,6 +1319,12 @@
             errorCount: presenter.getErrorCount(),
             userAreas: userAreas
         };
+
+        if (wasAnswersShow) {
+            presenter.currentAreaIdInGSAMode = lastAreaIdInGSAMode;
+            presenter.showAnswersAgain();
+        }
+
         return JSON.stringify(state);
     };
 
@@ -1606,6 +1614,25 @@
         presenter.deactivateShowAnswersMode();
     };
 
+    presenter.showAnswersAgain = function () {
+        if (!presenter.configuration.showAllAnswersInGradualShowAnswersMode) {
+            if (!presenter.isShowAnswersActive) {
+                presenter.activateShowAnswersMode();
+            }
+
+            if (presenter.currentAreaIdInGSAMode === 0) {
+                presenter.showAnswers();
+            } else {
+                for (let i = 0; i &lt; presenter.currentAreaIdInGSAMode; i++) {
+                    const area = presenter.configuration.areas[i];
+                    presenter.fillAreaWithCorrectColor(area);
+                }
+            }
+        } else {
+            presenter.showAnswers();
+        }
+    }
+
     presenter.activateShowAnswersMode = function () {
         presenter.isShowErrorsModeActive = false;
 
@@ -1794,9 +1821,37 @@
 
     ColoringKeyboardController.prototype.switchElement = function (move) {
         KeyboardController.prototype.switchElement.call(this, move);
-        if (!this.isColorSelectActive) presenter.markAreaWithCircle(this.keyboardNavigationCurrentElement);
+        if (this.isColorSelectActive) {
+            this.adjustScroll(move);
+        } else {
+            presenter.markAreaWithCircle(this.keyboardNavigationCurrentElement);
+        }
         this.readCurrentElement();
     };
+
+    ColoringKeyboardController.prototype.adjustScroll = function (move) {
+        let currentElement = this.colorElementsMap[this.keyboardNavigationCurrentElement.speechText][0];
+        let parentElement = currentElement.parentElement;
+
+        if (!isScrollbarVisible(parentElement)) {
+            return;
+        }
+
+        if (move &lt; 0) {
+            parentElement.scrollTo(0, currentElement.offsetTop);
+        } else {
+            let currentElementOffsetBottom = currentElement.offsetTop + currentElement.offsetHeight;
+            if (currentElementOffsetBottom &gt; parentElement.offsetHeight) {
+                parentElement.scrollTo(0, currentElementOffsetBottom - parentElement.offsetHeight);
+            } else {
+                parentElement.scrollTo(0, 0);
+            }
+        }
+    }
+
+    function isScrollbarVisible(element) {
+        return element.scrollHeight &gt; element.clientHeight;
+    }
 
     ColoringKeyboardController.prototype.enter = function (event) {
         if (presenter.isFirstEnter) {

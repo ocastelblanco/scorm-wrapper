@@ -95,6 +95,8 @@ div.paragraph-lock {
 </preview><presenter>function AddonParagraph_create() {
     var presenter = function () {};
     var eventBus;
+    var userAnswerAIReviewRequest = 'gradeByAi';
+    var userAnswerAIReviewResponse = 'aiGraded';
 
     presenter.placeholder = null;
     presenter.editor = null;
@@ -105,13 +107,23 @@ div.paragraph-lock {
     presenter.playerController = null;
     presenter.isVisibleValue = null;
     presenter.isShowAnswersActive = false;
+    presenter.wasShowAnswersActive = false;
     presenter.isErrorCheckingMode = false;
     presenter.cachedAnswer = [];
     presenter.currentGSAIndex = 0;
+    presenter.savedInitializedSA = null;
 
     presenter.isEditorLoaded = false;
+    presenter.isEditorReadOnly = false;
 
     presenter.toolbarChangeHeightTimeoutID = null;
+    presenter.paragraphInitTimeoutID = null;
+    presenter.currentPageIndex = null;
+    presenter.isWaitingForAIGrade = false;
+    presenter.aiGradeInterval = null;
+    presenter.MAX_WAIT_TIME = 15;
+    presenter.startTime = null;
+    presenter.updateScoreEventName = 'updateScore';
 
     presenter.LANGUAGES = {
         DEFAULT: "en_GB",
@@ -134,7 +146,8 @@ div.paragraph-lock {
         'removeformat subscript superscript forecolor backcolor |'.split(' ');
 
     presenter.ERROR_CODES = {
-        'W_01': 'Weight must be a positive number between 0 and 100'
+        'W_01': 'Weight must be a whole number between 0 and 100',
+        'W_02': 'Occurs a problem with checking your answers. Please try later.'
     };
 
     presenter.TOOLBAR_ARIAS = {
@@ -183,7 +196,9 @@ div.paragraph-lock {
             'setText': presenter.setText,
             'isAttempted': presenter.isAttempted,
             'lock': presenter.lock,
-            'unlock': presenter.unlock
+            'unlock': presenter.unlock,
+            'isAIReady': presenter.isAIReady,
+            'sendUserAnswerToAICheck': presenter.sendUserAnswerToAICheck,
         };
 
         return Commands.dispatch(commands, name, params, presenter);
@@ -225,7 +240,7 @@ div.paragraph-lock {
     };
 
     presenter.removeFocusFromDisabledElement = function () {
-        if (presenter.hasDisabledClass()) {
+        if (presenter.isEditorReadOnly) {
             const iframe = presenter.$view.find('iframe');
             iframe.blur();
         }
@@ -243,7 +258,7 @@ div.paragraph-lock {
     };
 
     presenter.createPreview = function AddonParagraph_createPreview(view, model) {
-        presenter.initializeEditor(view, model);
+        presenter.initializeEditor(view, model, true);
         presenter.setVisibility(true);
         var clickhandler = $("&lt;div&gt;&lt;/div&gt;").css({"background":"transparent", 'width': '100%', 'height': '100%', 'position':'absolute', 'top':0, 'left':0});
         presenter.$view.append(clickhandler);
@@ -251,7 +266,7 @@ div.paragraph-lock {
 
     presenter.setEventBus = function (wrappedEventBus) {
         eventBus = wrappedEventBus;
-        var events = ['ShowAnswers', 'HideAnswers', 'GradualShowAnswers', 'GradualHideAnswers'];
+        var events = ['ShowAnswers', 'HideAnswers', 'GradualShowAnswers', 'GradualHideAnswers', 'ValueChanged'];
         for (var i = 0; i &lt; events.length; i++) {
             eventBus.addEventListener(events[i], this);
         }
@@ -271,34 +286,41 @@ div.paragraph-lock {
             case "GradualHideAnswers":
                 presenter.hideAnswers();
                 break;
+
+            case "ValueChanged":
+                presenter.handleUpdateScoreEvent(eventData);
+                break;
         }
     };
 
     presenter.enableEdit = function () {
-        if(presenter.hasDisabledClass()) {
-            presenter.$view.find(".paragraph-wrapper").removeClass('disabled');
+        if(presenter.isEditorReadOnly) {
+            presenter.editor.setMode('design');
+            presenter.isEditorReadOnly = false;
         }
-    }
+    };
 
     presenter.disableEdit = function () {
-        if(!presenter.hasDisabledClass()) {
-            presenter.$view.find(".paragraph-wrapper").addClass('disabled');
+        if(!presenter.isEditorReadOnly) {
+            presenter.editor.setMode('readonly');
+            presenter.isEditorReadOnly = true;
         }
-    }
-
-    presenter.hasDisabledClass = function () {
-        return presenter.$view.find(".paragraph-wrapper").hasClass('disabled');
-    }
+    };
 
     presenter.showAnswers = function () {
         if (presenter.isShowAnswersActive) return;
 
-        const elements = presenter.getParagraphs();
-        presenter.initializeShowAnswers(elements);
-
-        elements[0].innerHTML = combineAnswers(presenter.configuration.modelAnswer);
-        presenter.isShowAnswersActive = true;
-        presenter.isErrorCheckingMode = false;
+        setTimeout(function () {
+            const elements = presenter.getParagraphs();
+            presenter.initializeShowAnswers(elements);
+            presenter.savedInitializedSA = presenter.getText();
+            var modelAnswer = combineAnswers(presenter.configuration.modelAnswer);
+            presenter.editor.setContent(modelAnswer);
+            presenter.setStyles();
+            presenter.isShowAnswersActive = true;
+            presenter.wasShowAnswersActive = true;
+            presenter.isErrorCheckingMode = false;
+        }, 0);
     };
 
     presenter.initializeShowAnswers = function Addon_Paragraph_initializeShowAnswers (elements) {
@@ -324,10 +346,16 @@ div.paragraph-lock {
         return newText;
     }
 
-    presenter.hideAnswers = function () {
+    presenter.hideAnswers = function (shouldEnableEdit = true) {
+        if (presenter.savedInitializedSA) {
+            presenter.setText(presenter.savedInitializedSA);
+            presenter.savedInitializedSA = null;
+        }
         const elements = presenter.getParagraphs();
 
-        presenter.enableEdit();
+        if (shouldEnableEdit) {
+            presenter.enableEdit();
+        }
         presenter.isShowAnswersActive = false;
         presenter.isGradualShowAnswersActive = false;
         presenter.isErrorCheckingMode = false;
@@ -341,24 +369,104 @@ div.paragraph-lock {
             }
             presenter.cachedAnswer = [];
         }
-    }
+    };
+
+    presenter.handleDisablingEdition = function () {
+        if (presenter.wasShowAnswersActive &amp;&amp; presenter.currentGSAIndex === 0) {
+            presenter.wasShowAnswersActive = false;
+            presenter.hideAnswers(false);
+            setTimeout(function () {
+                presenter.disableEdit();
+            }, 0);
+        } else {
+            presenter.disableEdit();
+        }
+    };
 
     presenter.gradualShowAnswers = function (data) {
-        presenter.disableEdit();
+        presenter.handleDisablingEdition();
+
         if (data.moduleID !== presenter.configuration.ID) { return; }
 
-        const elements = presenter.getParagraphs();
-        if (!presenter.isGradualShowAnswersActive) {
-            presenter.initializeShowAnswers(elements);
-            presenter.isGradualShowAnswersActive = true;
-        }
-        presenter.isErrorCheckingMode = false;
+        setTimeout(function () {
+            const elements = presenter.getParagraphs();
+            if (!presenter.isGradualShowAnswersActive) {
+                presenter.initializeShowAnswers(elements);
+                presenter.isGradualShowAnswersActive = true;
+            }
+            presenter.isErrorCheckingMode = false;
 
-        if (presenter.currentGSAIndex !== 0) {
-            elements[0].innerHTML += "&lt;div&gt;&lt;/div&gt;&lt;br&gt;";
+            if (presenter.currentGSAIndex !== 0) {
+                elements[0].innerHTML += "&lt;div&gt;&lt;/div&gt;&lt;br&gt;";
+            }
+            elements[0].innerHTML += presenter.configuration.modelAnswer[presenter.currentGSAIndex].Text;
+            presenter.currentGSAIndex++;
+        }, 0);
+    };
+
+    presenter.sendUserAnswerToAICheck = function () {
+        if(!presenter.isAIReady() || presenter.isWaitingForAIGrade) { return; }
+
+        const data = presenter.getDataRequestToAI();
+
+        window.addEventListener("message", presenter.onExternalMessage);
+        presenter.playerController.sendExternalEvent(userAnswerAIReviewRequest, data);
+        presenter.isWaitingForAIGrade = true;
+        presenter.waitForAIGrade();
+    };
+
+    presenter.getDataRequestToAI = function () {
+        const pageID = presenter.playerController.getPresentation().getPage(presenter.currentPageIndex).getId();
+        const activityID = presenter.configuration.ID;
+        const activityMaxScore = presenter.getMaxScore();
+        const pageWeight = presenter.playerController.getPresentation().getPage(presenter.currentPageIndex).getPageWeight();
+        const pageMaxScore = presenter.playerController.getPresentation().getPage(presenter.currentPageIndex).getModulesMaxScore();
+        const answer = presenter.getText().replace(/&lt;(.*?)&gt;/g, '').replace(/&amp;nbsp;/g, '');
+
+        return JSON.stringify({
+            'page_id': pageID,
+            'activity_id': activityID,
+            'activity_max_score': activityMaxScore,
+            'page_weight': pageWeight,
+            'page_max_score': pageMaxScore,
+            'answer': answer
+        });
+    };
+
+    presenter.onExternalMessage = function (event) {
+        const data = event.data;
+
+        if (presenter.isValidResponse(data)) {
+            presenter.updateOpenActivityScore(data);
         }
-        elements[0].innerHTML += presenter.configuration.modelAnswer[presenter.currentGSAIndex].Text;
-        presenter.currentGSAIndex++;
+    };
+
+    presenter.isValidResponse = function (data) {
+        const isAIResponse = data.includes(userAnswerAIReviewResponse);
+        if (!isAIResponse) { return isAIResponse; }
+
+        const pageID = presenter.playerController.getPresentation().getPage(presenter.currentPageIndex).getId();
+        const activityID = presenter.configuration.ID;
+        const isValidPageID = data.includes(pageID);
+        const isValidActivityID = data.includes(activityID);
+
+        return isAIResponse &amp;&amp; isValidPageID &amp;&amp; isValidActivityID;
+    };
+
+    presenter.updateOpenActivityScore = function (data) {
+        const parsedData = JSON.parse(data.replace(`EXTERNAL_${userAnswerAIReviewResponse}:`, '').trim());
+        const pageID = parsedData.page_id;
+        const activityID = parsedData.activity_id;
+        const aiGrade = parsedData.ai_grade;
+        const aiRelevance = parsedData.ai_relevance;
+
+        OpenActivitiesUtils.updateOpenActivityScore(
+            presenter.playerController,
+            pageID,
+            activityID,
+            aiGrade,
+            aiRelevance
+        );
     };
 
     presenter.setShowErrorsMode = function () {
@@ -389,7 +497,7 @@ div.paragraph-lock {
             $iframeBody = $iframe.contents().find("#tinymce");
 
         return $iframeBody.children();
-    }
+    };
 
     presenter.run = function AddonParagraph_run(view, model) {
         presenter.initializeEditor(view, model, false);
@@ -397,15 +505,16 @@ div.paragraph-lock {
         presenter.isLocked = false;
     };
 
-    presenter.initializeEditor = function AddonParagraph_initializeEditor(view, model) {
+    presenter.initializeEditor = function AddonParagraph_initializeEditor(view, model, isPreview) {
         if (presenter.loaded){ return;}
         presenter.loaded = true;
         presenter.view = view;
         presenter.$view = $(view);
         var upgradedModel = presenter.upgradeModel(model);
-        presenter.configuration = presenter.validateModel(upgradedModel);
+        presenter.model = upgradedModel;
+        presenter.configuration = presenter.validateModel(upgradedModel, isPreview);
 
-        if (presenter.configuration.isError) {
+        if (!presenter.configuration.isValid) {
             DOMOperationsUtils.showErrorMessage(view, presenter.ERROR_CODES, presenter.configuration.errorCode);
             return;
         }
@@ -417,6 +526,23 @@ div.paragraph-lock {
 
         presenter.setWrapperID();
 
+        if (presenter.playerController) {
+            var paragraphInitDelay = presenter.playerController.getExternalVariable('paragraphInitDelay');
+            if (paragraphInitDelay.length == 0 || isNaN(paragraphInitDelay)) {
+                presenter.initTinymce();
+            } else {
+                presenter.$view.css("visibility", "hidden");
+                presenter.paragraphInitTimeoutID = setTimeout(presenter.initTinymce, Number(paragraphInitDelay));
+            }
+        } else {
+            presenter.initTinymce();
+        }
+    };
+
+    presenter.initTinymce = function() {
+        if (!document.body.contains(presenter.view)) {
+            return;
+        }
         presenter.placeholder = new presenter.placeholderElement();
         presenter.configuration.plugins = presenter.getPlugins();
         presenter.addPlugins();
@@ -439,7 +565,7 @@ div.paragraph-lock {
 
             presenter.isEditorLoaded = true;
             presenter.setStyles();
-            presenter.setSpeechTexts(upgradedModel["speechTexts"]);
+            presenter.setSpeechTexts(presenter.model["speechTexts"]);
             presenter.buildKeyboardController();
         });
 
@@ -449,7 +575,8 @@ div.paragraph-lock {
             $(input).css('display', 'none');
             presenter.$view.append(input);
         }
-    };
+        presenter.paragraphInitTimeoutID = null;
+    }
 
     presenter.setWrapperID = function AddonParagraph_setWrapperID() {
         var $paragraphWrapper = presenter.$view.find('.paragraph-wrapper');
@@ -489,7 +616,7 @@ div.paragraph-lock {
         };
     };
 
-     presenter.findIframeAndSetStyles = function AddonParagraph_findIframeAndSetStyles() {
+    presenter.findIframeAndSetStyles = function AddonParagraph_findIframeAndSetStyles() {
         var iframe = presenter.$view.find(".paragraph-wrapper").find("iframe"),
             body = $(iframe).contents().find("#tinymce"),
             element = body.find("p");
@@ -566,10 +693,14 @@ div.paragraph-lock {
     /**
      * Parses model and set settings to default values if either of them is empty
      *
-     * @param model
+     * IMPORTANT. Validation resulting in a validation error, e.g. W_01, must be implemented in Open Activities
+     * on the mCourser side.
+     *
+     * @param model:object
+     * @param isPreview:boolean
      * @returns {{fontFamily: *, fontSize: *}}
      */
-    presenter.validateModel = function AddonParagraph_validateModel(model) {
+    presenter.validateModel = function AddonParagraph_validateModel(model, isPreview) {
         var fontFamily = model['Default font family'],
             fontSize = model['Default font size'],
             isToolbarHidden = ModelValidationUtils.validateBoolean(model['Hide toolbar']),
@@ -594,8 +725,9 @@ div.paragraph-lock {
             hasDefaultFontSize = true;
         }
 
-        if (!ModelValidationUtils.isStringEmpty(weight) &amp;&amp; !ModelValidationUtils.validateIntegerInRange(weight, 100, 0).isValid ) {
-            return {isError: true, errorCode: 'W_01'}
+        const validatedWeight = presenter.validateWeight(weight, isPreview);
+        if (!validatedWeight.isValid) {
+            return validatedWeight;
         }
 
         height -= !isToolbarHidden ? 37 : 2;
@@ -621,12 +753,29 @@ div.paragraph-lock {
             isPlaceholderEditable: isPlaceholderEditable,
             title: title,
             manualGrading: manualGrading,
-            weight: weight,
+            weight: validatedWeight.value,
             modelAnswer: modelAnswer,
             langTag: model["langAttribute"],
             isBlockedInErrorCheckingMode: ModelValidationUtils.validateBoolean(model["Block in error checking mode"]),
         };
     };
+
+    presenter.validateWeight = function (weight, isPreview) {
+        if (ModelValidationUtils.isStringEmpty(weight)) {
+            return getCorrectObject(1);
+        }
+
+        const validatedInteger = ModelValidationUtils.validateIntegerInRange(weight, 100, 0);
+        if (!validatedInteger.isValid) {
+            return ModelErrorUtils.getErrorObject("W_01");
+        }
+        if (isPreview &amp;&amp; (validatedInteger.value + "") !== weight) {
+            return ModelErrorUtils.getErrorObject("W_01");
+        }
+        return getCorrectObject(validatedInteger.value);
+    };
+
+    function getCorrectObject(val) { return { isValid: true, value: val }; }
 
     /**
      * Initialize the addon.
@@ -792,6 +941,7 @@ div.paragraph-lock {
             }
 
             clearTimeout(presenter.toolbarChangeHeightTimeoutID);
+            clearTimeout(presenter.paragraphInitTimeoutID);
             presenter.toolbarChangeHeightTimeoutID = null;
 
             presenter.placeholder = null;
@@ -1080,6 +1230,10 @@ div.paragraph-lock {
         presenter.setStyles();
         if (presenter.configuration.state !== undefined) {
             presenter.editor.setContent(presenter.configuration.state, {format : 'raw'});
+            presenter.configuration.state = undefined;
+            presenter.setVisibility(presenter.isVisibleValue);
+        } else {
+            presenter.setVisibility(presenter.configuration.isVisible);
         }
 
         presenter.$tinyMCEToolbar = presenter.$view.find('.mce-toolbar');
@@ -1127,11 +1281,15 @@ div.paragraph-lock {
     presenter.setPlayerController = function AddonParagraph_setPlayerController(controller) {
         presenter.playerController = controller;
         presenter.eventBus = presenter.playerController.getEventBus();
+        presenter.currentPageIndex = presenter.playerController.getCurrentPageIndex();
+        presenter.pageID = presenter.playerController.getPresentation().getPage(presenter.currentPageIndex).getId();
     };
 
     presenter.getState = function AddonParagraph_getState() {
         var tinymceState;
-        if (presenter.editor != undefined &amp;&amp; presenter.editor.hasOwnProperty("id")) {
+        if (presenter.configuration.state !== undefined) {
+            tinymceState = presenter.configuration.state;
+        } else if (presenter.editor != undefined &amp;&amp; presenter.editor.hasOwnProperty("id")) {
             try{
                 const isShowAnswersActive = presenter.isShowAnswersActive;
                 if (isShowAnswersActive) presenter.hideAnswers();
@@ -1155,17 +1313,19 @@ div.paragraph-lock {
         if (state === null || ModelValidationUtils.isStringEmpty(state))
             return;
         presenter.printableState = JSON.parse(state).tinymceState;
-    }
+    };
 
     presenter.setState = function AddonParagraph_setState(state) {
         var parsedState = JSON.parse(state),
             tinymceState = parsedState.tinymceState;
 
-        presenter.configuration.isVisible = parsedState.isVisible;
-        presenter.setVisibility(presenter.configuration.isVisible);
+        presenter.isVisibleValue = parsedState.isVisible;
+        if (presenter.editor != null &amp;&amp; presenter.editor.initialized &amp;&amp; presenter.isEditorLoaded) {
+            presenter.setVisibility(presenter.isVisibleValue);
+        }
 
         if (tinymceState!=undefined &amp;&amp; tinymceState!="" &amp;&amp; !isPlaceholderClassInHTML(tinymceState)) {
-            if (presenter.editor != null &amp;&amp; presenter.editor.initialized) {
+            if (presenter.editor != null &amp;&amp; presenter.editor.initialized &amp;&amp; presenter.isEditorLoaded) {
                 presenter.editor.setContent(tinymceState, {format: 'raw'});
                 presenter.state = state;
             } else {
@@ -1201,17 +1361,15 @@ div.paragraph-lock {
     };
 
     presenter.show = function AddonParagraph_show() {
-        presenter.configuration.isVisible = true;
         presenter.setVisibility(true);
     };
 
     presenter.hide = function AddonParagraph_hide() {
-        presenter.configuration.isVisible = false;
         presenter.setVisibility(false);
     };
 
     presenter.isVisible = function AddonParagraph_isVisible() {
-        return presenter.configuration.isVisible;
+        return presenter.isVisibleValue;
     };
 
     presenter.setText = function(text) {
@@ -1241,7 +1399,7 @@ div.paragraph-lock {
 
     presenter.getPrintableHTML = function (model, showAnswers) {
         var model = presenter.upgradeModel(model);
-        var configuration = presenter.validateModel(model);
+        var configuration = presenter.validateModel(model, false);
         var modelAnswers = configuration.modelAnswer;
 
         var $wrapper = $('&lt;div&gt;&lt;/div&gt;');
@@ -1425,6 +1583,53 @@ div.paragraph-lock {
         });
         return answersCount;
     };
+
+    presenter.getMaxScore = function () {
+        if (!presenter.configuration.isValid || !presenter.configuration.manualGrading) {
+            return 0;
+        }
+        return presenter.configuration.weight;
+    };
+
+    presenter.isAIReady = function() {
+        if (!presenter.configuration.isValid
+            || !presenter.configuration.manualGrading
+            || !presenter.playerController
+        ) {
+            return false;
+        }
+        return OpenActivitiesUtils.isAIReady(
+            presenter.playerController,
+            presenter.pageID,
+            presenter.configuration.ID
+        );
+    };
+
+    presenter.waitForAIGrade = function () {
+        presenter.startTime = new Date().getTime();
+        presenter.disableEdit();
+        presenter.aiGradeInterval = setInterval(function () {
+            presenter.checkTimer();
+        }, 1000);
+    };
+
+    presenter.checkTimer = function () {
+        const currentTime = new Date().getTime();
+        if ((currentTime - presenter.startTime) / 1_000 &gt;= presenter.MAX_WAIT_TIME) {
+            clearInterval(presenter.aiGradeInterval);
+            presenter.isWaitingForAIGrade = false;
+            presenter.enableEdit();
+            DOMOperationsUtils.showErrorMessage(presenter.view, presenter.ERROR_CODES, presenter.configuration.errorCode);
+        }
+    }
+
+    presenter.handleUpdateScoreEvent = function (eventData) {
+        if (eventData.source !== presenter.configuration.ID &amp;&amp; eventData.value !== presenter.updateScoreEventName) { return; }
+
+        clearInterval(presenter.aiGradeInterval);
+        presenter.isWaitingForAIGrade = false;
+        presenter.enableEdit();
+    }
 
     return presenter;
 }

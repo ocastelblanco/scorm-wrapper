@@ -82,7 +82,7 @@
             presenter.createErrorView(view, presenter.configuration.errorCode);
             return;
         }
-
+        presenter.accessCacheId = presenter.generateAccessCacheId();
         presenter.createView(view);
         presenter.connectHandlers();
         presenter.setSpeechTexts(upgradedModel["speechTexts"]);
@@ -113,13 +113,15 @@
             return {isError: true, errorCode: 'V_04'};
         }
 
+        var checkForLessonIdAccess = false;
         if (checkForAccess &amp;&amp; model.AccessIDs.trim().length === 0) {
             model.AccessIDs = validatedCourseId.value
                 ? validatedCourseId.value
                 : model.LessonID;
+            checkForLessonIdAccess = model.AccessIDs == model.LessonID;
         }
 
-        var validatedAccessIds = presenter.validateAccessIds(model.AccessIDs);
+        var validatedAccessIds = presenter.validateAccessIds(model.AccessIDs, checkForLessonIdAccess);
         if (checkForAccess &amp;&amp; !validatedAccessIds.isValid) {
             return {isError: true, errorCode: 'V_05'};
         }
@@ -181,13 +183,13 @@
         }
     };
 
-    presenter.validateAccessIds = function AddonCross_Lesson_validateAccessIds (raw) {
+    presenter.validateAccessIds = function AddonCross_Lesson_validateAccessIds (raw, isLessonId) {
         const ids = presenter.transformAccessIdsToArray(raw);
         const onlyDigitsRegex = /^\d*$/;
 
         const filteredIds = ids
             .map(id =&gt; id.trim())
-            .filter((id) =&gt; (id.length &gt; 0 &amp;&amp; onlyDigitsRegex.test(id)));
+            .filter((id) =&gt; (id.length &gt; 0 &amp;&amp; (onlyDigitsRegex.test(id) || onlyDigitsRegex.test(isLessonId))));
 
         if (ids.length !== filteredIds.length) {
             return {isValid: false};
@@ -233,8 +235,11 @@
     };
 
     presenter.connectHandlers = function () {
-        presenter.$wrapper[0].addEventListener('click', presenter.clickHandler);
-        presenter.$wrapper[0].addEventListener('touchend', presenter.clickHandler);
+        if (MobileUtils.isMobileUserAgent(navigator.userAgent)) {
+            presenter.$wrapper[0].addEventListener('touchend', presenter.clickHandler);
+        } else {
+            presenter.$wrapper[0].addEventListener('click', presenter.clickHandler);
+        }
     };
 
     presenter.clickHandler = function (event) {
@@ -252,8 +257,21 @@
             if (value !== 'true') {
                 presenter.hide();
             }
+            presenter.updateAccessCache(value == 'true');
         }
     };
+
+    presenter.updateAccessCache = function(hasAccess) {
+        if (presenter.configuration.accessIds.length == 0) return;
+        if (window.crossLessonAccessCache == null) window.crossLessonAccessCache = {};
+        window.crossLessonAccessCache[presenter.accessCacheId] = hasAccess;
+    }
+
+    presenter.generateAccessCacheId = function() {
+        if (presenter.configuration.accessIds.length == 0) return '';
+        var sortedIds = presenter.configuration.accessIds.slice().sort();
+        return sortedIds.toString();
+    }
 
     presenter.requestCrossLesson = function () {
        const data = presenter.getExternalEventData();
@@ -293,6 +311,15 @@
 
         if (!presenter.configuration.checkForAccess) {
             return;
+        }
+
+        if (window.crossLessonAccessCache != null) {
+            if (window.crossLessonAccessCache[presenter.accessCacheId] !== undefined) {
+                if (!window.crossLessonAccessCache[presenter.accessCacheId]) {
+                    presenter.hide();
+                }
+                return;
+            }
         }
 
         const data = {

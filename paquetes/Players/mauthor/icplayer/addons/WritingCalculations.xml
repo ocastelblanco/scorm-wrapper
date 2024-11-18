@@ -18,6 +18,60 @@
         <property displayName="Is not activity" name="Is not activity" nameLabel="WritingCalculations_property_is_not_activity" type="boolean"/>
         <property displayName="Enable more digits in gap" name="Multisigns" nameLabel="WritingCalculations_property_is_not_activity" type="boolean"/>
         <property displayName="Use numeric keyboard" name="useNumericKeyboard" nameLabel="WritingCalculations_use_numeric_keyboard" type="boolean"/>
+        <property name="showAllAnswersInGSA" nameLabel="WritingCalculations_show_all_answers_in_GSA" type="boolean"/>
+        <property displayName="Description of operation" name="DescriptionOfOperation" nameLabel="WritingCalculations_description_of_operation" type="string"/>
+        <property displayName="Lang attribute" name="LangTag" nameLabel="WritingCalculations_lang_attribute" type="string"/>
+        <property displayName="Speech texts" name="speechTexts" nameLabel="WritingCalculations_speech_texts" type="staticlist">
+
+            <property name="Gap" nameLabel="WritingCalculations_gap" type="staticrow">
+                <property name="Gap" nameLabel="WritingCalculations_gap" type="string"/>
+            </property>
+
+            <property name="AdditionalGap" nameLabel="WritingCalculations_additional_gap" type="staticrow">
+                <property name="AdditionalGap" nameLabel="WritingCalculations_additional_gap" type="string"/>
+            </property>
+
+            <property name="Empty" nameLabel="WritingCalculations_empty" type="staticrow">
+                <property name="Empty" nameLabel="WritingCalculations_empty" type="string"/>
+            </property>
+
+            <property name="AdditionSign" nameLabel="WritingCalculations_addition_sign" type="staticrow">
+                <property name="AdditionSign" nameLabel="WritingCalculations_addition_sign" type="string"/>
+            </property>
+
+            <property name="SubtractionSign" nameLabel="WritingCalculations_subtraction_sign" type="staticrow">
+                <property name="SubtractionSign" nameLabel="WritingCalculations_subtraction_sign" type="string"/>
+            </property>
+
+            <property name="DivisionSign" nameLabel="WritingCalculations_division_sign" type="staticrow">
+                <property name="DivisionSign" nameLabel="WritingCalculations_division_sign" type="string"/>
+            </property>
+
+            <property name="MultiplicationSign" nameLabel="WritingCalculations_multiplication_sign" type="staticrow">
+                <property name="MultiplicationSign" nameLabel="WritingCalculations_multiplication_sign" type="string"/>
+            </property>
+
+            <property name="EqualsSign" nameLabel="WritingCalculations_equals_sign" type="staticrow">
+                <property name="EqualsSign" nameLabel="WritingCalculations_equals_sign" type="string"/>
+            </property>
+
+            <property name="DecimalSeparator" nameLabel="WritingCalculations_decimal_separator" type="staticrow">
+                <property name="DecimalSeparator" nameLabel="WritingCalculations_decimal_separator" type="string"/>
+            </property>
+
+            <property name="Line" nameLabel="WritingCalculations_line" type="staticrow">
+                <property name="Line" nameLabel="WritingCalculations_line" type="string"/>
+            </property>
+
+            <property name="Correct" nameLabel="WritingCalculations_correct" type="staticrow">
+                <property name="Correct" nameLabel="WritingCalculations_correct" type="string"/>
+            </property>
+
+            <property name="Wrong" nameLabel="WritingCalculations_wrong" type="staticrow">
+                <property name="Wrong" nameLabel="WritingCalculations_wrong" type="string"/>
+            </property>
+
+        </property>
     </model>
 <css>.wrapper-cell, .writing-calculations-input {
     float: left;
@@ -90,6 +144,12 @@
 .correct {
     border: 1px solid #00bb00;
 }
+
+.container-helpBox .writing-calculations-input {
+    background-color: lightslategray;
+    width: 20px;
+    height: 20px;
+}
 </css><view>&lt;div id="writing-calculations-wrapper"&gt;&lt;/div&gt;
 </view><preview>&lt;div id="writing-calculations-wrapper"&gt;&lt;/div&gt;
 </preview><presenter>function AddonWritingCalculations_create() {
@@ -102,7 +162,24 @@
     presenter.answers = [];
     presenter.isCommutativity;
     presenter.useNumericKeyboard = false;
+    presenter.isGradualShowAnswersActive = false;
+    presenter.isScoreSaved = false;
+    presenter.userAnswers = [];
+    presenter.helpBoxesDefaultValues = [];
+    presenter.helpBoxesUserAnswers = [];
+    presenter.isDisabled = false;
+    presenter.isWCAGOn = false;
+    presenter.elementsTable = [];
+    presenter.gapElements = [];
+    presenter.isGapFocused = false;
     var eventBus;
+
+    presenter.keyboardState = {
+        x: 0,
+        y: -1,
+        gapIndex: -1
+    }
+    presenter.KEYBOARD_SELECTED_CLASS = 'keyboard_navigation_active_element';
 
     presenter.ELEMENT_TYPE = {
         "NUMBER" : 1,        // Non box numbers
@@ -110,11 +187,26 @@
         "SYMBOL" : 3,
         "EMPTY_SPACE" : 4,
         "LINE" : 5,
-        "DOT" : 6
+        "DOT" : 6,
+        "HELP_BOX" : 7,
     };
 
     presenter.upgradeModel = function (model) {
-        return presenter.upgradeSigns(model);
+        let upgradedModel = presenter.upgradeSigns(model);
+        upgradedModel = presenter.upgradeNumericKeyboard(upgradedModel);
+        upgradedModel =  presenter.upgradeModelAddShowAllAnswersInGSA(upgradedModel);
+        return presenter.upgradeTTS(upgradedModel);
+    };
+
+    presenter.upgradeModelAddShowAllAnswersInGSA = function (model) {
+        const upgradedModel = {};
+        $.extend(true, upgradedModel, model);
+
+        if (!upgradedModel.hasOwnProperty('showAllAnswersInGSA')) {
+            upgradedModel['showAllAnswersInGSA'] = 'False';
+        }
+
+        return upgradedModel;
     };
 
     presenter.upgradeSigns = function (model) {
@@ -132,12 +224,72 @@
         return upgradedModel;
     };
 
+    presenter.upgradeTTS = function (model) {
+        if ('speechTexts' in model) return model;
+
+        var upgradedModel = {};
+        $.extend(true, upgradedModel, model); // Deep copy of model object
+
+        if (!upgradedModel["speechTexts"]) {
+            upgradedModel["speechTexts"] = {};
+        }
+        if (!upgradedModel["speechTexts"]["Gap"]) {
+            upgradedModel["speechTexts"]["Gap"] = {Gap: ""};
+        }
+        if (!upgradedModel["speechTexts"]["AdditionalGap"]) {
+            upgradedModel["speechTexts"]["AdditionalGap"] = {AdditionalGap: ""};
+        }
+        if (!upgradedModel["speechTexts"]["Empty"]) {
+            upgradedModel["speechTexts"]["Empty"] = {Empty: ""};
+        }
+        if (!upgradedModel["speechTexts"]["AdditionSign"]) {
+            upgradedModel["speechTexts"]["AdditionSign"] = {AdditionSign: ""};
+        }
+        if (!upgradedModel["speechTexts"]["SubtractionSign"]) {
+            upgradedModel["speechTexts"]["SubtractionSign"] = {SubtractionSign: ""};
+        }
+        if (!upgradedModel["speechTexts"]["DivisionSign"]) {
+            upgradedModel["speechTexts"]["DivisionSign"] = {DivisionSign: ""};
+        }
+        if (!upgradedModel["speechTexts"]["MultiplicationSign"]) {
+            upgradedModel["speechTexts"]["MultiplicationSign"] = {MultiplicationSign: ""};
+        }
+        if (!upgradedModel["speechTexts"]["EqualsSign"]) {
+            upgradedModel["speechTexts"]["EqualsSign"] = {EqualsSign: ""};
+        }
+        if (!upgradedModel["speechTexts"]["DecimalSeparator"]) {
+            upgradedModel["speechTexts"]["DecimalSeparator"] = {DecimalSeparator: ""};
+        }
+        if (!upgradedModel["speechTexts"]["Line"]) {
+            upgradedModel["speechTexts"]["Line"] = {Line: ""};
+        }
+        if (!upgradedModel["speechTexts"]["Correct"]) {
+            upgradedModel["speechTexts"]["Correct"] = {Correct: ""};
+        }
+        if (!upgradedModel["speechTexts"]["Wrong"]) {
+            upgradedModel["speechTexts"]["Wrong"] = {Wrong: ""};
+        }
+
+        if (!upgradedModel["DescriptionOfOperation"]) {
+            upgradedModel["DescriptionOfOperation"] = "";
+        }
+
+        if (!upgradedModel["LangTag"]) {
+            upgradedModel["LangTag"] = "";
+        }
+
+        return upgradedModel;
+    };
+
     presenter.ERROR_MESSAGES = {
-        V01 : 'Error in row number %rowIndex%. Missing closing bracket.',
-        V02 : 'Error in row number %rowIndex%. Missing opening bracket.',
-        V03 : 'Error in row number %rowIndex%. Missing number between brackets.',
+        V01 : 'Error in row number %rowIndex%. Missing closing square bracket.',
+        V02 : 'Error in row number %rowIndex%. Missing opening square bracket.',
+        V03 : 'Error in row number %rowIndex%. Missing number between square brackets.',
         V04 : 'Error in row number %rowIndex%. Number between brackets must be from 0 to 9.',
-        V05 : 'Error in row number %rowIndex%. Given value "%value%" is not a valid number.',
+        V05 : 'Error in row number %rowIndex%. Given value "%value%" in square brackets is not a valid number.',
+        V06 : 'Error in row number %rowIndex%. Missing closing curly bracket.',
+        V07 : 'Error in row number %rowIndex%. Missing opening curly bracket.',
+        V08 : 'Error in row number %rowIndex%. Given value "%value%" in curly brackets is not a valid. Curly brackets must be empty or have a valid number.',
     };
 
     presenter.run = function(view, model) {
@@ -146,16 +298,13 @@
         eventBus = presenter.playerController.getEventBus();
         eventBus.addEventListener('ShowAnswers', this);
         eventBus.addEventListener('HideAnswers', this);
+        eventBus.addEventListener('GradualShowAnswers', this);
+        eventBus.addEventListener('GradualHideAnswers', this);
     };
 
     presenter.createPreview = function(view, model) {
         presenterLogic(view, model);
         presenter.setVisibility(true);
-    };
-
-    presenter.upgradeModel = function (model) {
-        var upgradedModel = presenter.upgradeNumericKeyboard(model);
-        return upgradedModel;
     };
 
     presenter.upgradeNumericKeyboard = function (model) {
@@ -180,7 +329,11 @@
         presenter.multisigns = ModelValidationUtils.validateBoolean(model['Multisigns']);
         presenter.isVisible = ModelValidationUtils.validateBoolean(model['Is Visible']);
         presenter.isVisibleByDefault = ModelValidationUtils.validateBoolean(model['Is Visible']);
-
+        presenter.ID = model["ID"];
+        presenter.showAllAnswersInGSA = ModelValidationUtils.validateBoolean(model['showAllAnswersInGSA']);
+        presenter.langTag = model["LangTag"];
+        presenter.descriptionOfOperation = model["DescriptionOfOperation"];
+        presenter.setSpeechTexts(model["speechTexts"]);
         let validatedElementsData = presenter.validateModelValue(model['Value']);
         if (!validatedElementsData.isValid) {
             presenter.showErrorMessage(
@@ -193,6 +346,43 @@
 
         presenter.setContainerWidth();
         presenter.addAdditionalStyles();
+    }
+
+    presenter.setSpeechTexts = function(speechTexts) {
+        presenter.speechTexts = {
+            gap: 'gap',
+            additionalGap: 'additional gap',
+            empty: 'empty',
+            additionSign: 'addition sign',
+            subtractionSign: 'subtraction sign',
+            divisionSign: 'division sign',
+            multiplicationSign: 'multiplication sign',
+            equalsSign: 'equals sign',
+            decimalSeparator: 'decimal separator',
+            line: 'line',
+            correct: 'correct',
+            wrong: 'wrong',
+
+        };
+
+        if (!speechTexts) {
+            return;
+        }
+
+        presenter.speechTexts = {
+            gap: TTSUtils.getSpeechTextProperty(speechTexts['Gap']['Gap'], presenter.speechTexts.gap),
+            additionalGap: TTSUtils.getSpeechTextProperty(speechTexts['AdditionalGap']['AdditionalGap'], presenter.speechTexts.additionalGap),
+            empty: TTSUtils.getSpeechTextProperty(speechTexts['Empty']['Empty'], presenter.speechTexts.empty),
+            additionSign: TTSUtils.getSpeechTextProperty(speechTexts['AdditionSign']['AdditionSign'], presenter.speechTexts.additionSign),
+            subtractionSign: TTSUtils.getSpeechTextProperty(speechTexts['SubtractionSign']['SubtractionSign'], presenter.speechTexts.subtractionSign),
+            divisionSign: TTSUtils.getSpeechTextProperty(speechTexts['DivisionSign']['DivisionSign'], presenter.speechTexts.divisionSign),
+            multiplicationSign: TTSUtils.getSpeechTextProperty(speechTexts['MultiplicationSign']['MultiplicationSign'], presenter.speechTexts.multiplicationSign),
+            equalsSign: TTSUtils.getSpeechTextProperty(speechTexts['EqualsSign']['EqualsSign'], presenter.speechTexts.equalsSign),
+            decimalSeparator: TTSUtils.getSpeechTextProperty(speechTexts['DecimalSeparator']['DecimalSeparator'], presenter.speechTexts.decimalSeparator),
+            line: TTSUtils.getSpeechTextProperty(speechTexts['Line']['Line'], presenter.speechTexts.line),
+            correct: TTSUtils.getSpeechTextProperty(speechTexts['Correct']['Correct'], presenter.speechTexts.correct),
+            wrong: TTSUtils.getSpeechTextProperty(speechTexts['Wrong']['Wrong'], presenter.speechTexts.wrong)
+        };
     }
 
     presenter.readSigns = function( signs ) {
@@ -266,20 +456,22 @@
     };
 
     presenter.bindValueChangeEvent = function() {
-        var $input = presenter.$view.find(".writing-calculations-input");
-        $input.on('click', function(event) {
+        const $inputs = presenter.getInputs();
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+
+        $inputs.on('click', function(event) {
             event.stopPropagation();
         });
 
-        $input.on('keyup', function(event) {
-            presenter.onKeyUp(event)
+        $inputs.on('keyup', function(event) {
+            presenter.onKeyUp(event);
         });
 
-        $input.on('keypress', function(event) {
-            presenter.onKeyPress(event)
+        $inputs.on('keypress', function(event) {
+            presenter.onKeyPress(event);
         });
 
-        $input.on("change", function(event) {
+        $emptyBoxesInputs.on("change", function(event) {
             event.stopPropagation();
 
             var value = event.target.value;
@@ -292,8 +484,8 @@
                 isCorrect = 1;
             }
 
-            if (presenter.isCommutativity &amp;&amp; presenter.isAllFilled()) {
-                presenter.triggerValueChangeEvent("", "all", presenter.isAllCorrectlyFilled() ? 1 : 0);
+            if (presenter.isCommutativity &amp;&amp; presenter.isAllEmptyBoxInputsFilled()) {
+                presenter.triggerValueChangeEvent("", "all", presenter.isAllEmptyBoxInputsCorrectlyFilled() ? 1 : 0);
             }
 
             if (!presenter.isCommutativity) {
@@ -345,41 +537,58 @@
     };
 
     presenter.createView = function (elementsData) {
-        let viewWrapper = this.$view.find("#writing-calculations-wrapper");
+        presenter.elementsTable = [];
+        presenter.gapElements = [];
+        const $viewWrapper = this.$view.find("#writing-calculations-wrapper");
         elementsData.forEach((elementsRow, rowIndex) =&gt; {
-            let rowWrapper = presenter.createRowWrapper(rowIndex);
+            var createdElementsRow = [];
+            const $rowWrapper = presenter.createRowWrapper(rowIndex);
             let cellIndex = 0;
             elementsRow.forEach((elementData) =&gt; {
-                let createdElement = presenter.createElement(elementData.type);
+                const createdElement = presenter.createElement(elementData.type);
 
                 if (elementData.type !== presenter.ELEMENT_TYPE.LINE) {
                     addCellClass(createdElement, cellIndex);
                 }
 
-                presenter.transformElement(createdElement, elementData.rawValue, elementData.type);
+                presenter.transformElement(createdElement, elementData.parsedValue, elementData.type);
 
+                const ELEMENT_TYPES_WITH_POSITION = [
+                    presenter.ELEMENT_TYPE.EMPTY_BOX,
+                    presenter.ELEMENT_TYPE.NUMBER,
+                    presenter.ELEMENT_TYPE.HELP_BOX
+                ];
                 if (elementData.isVisiblePosition()
-                    &amp;&amp; (elementData.type === presenter.ELEMENT_TYPE.EMPTY_BOX
-                        || elementData.type === presenter.ELEMENT_TYPE.NUMBER)) {
+                    &amp;&amp; (ELEMENT_TYPES_WITH_POSITION.includes(elementData.type))) {
                     presenter.addPosition(createdElement, elementData.getPosition());
                 }
 
-                rowWrapper.append(createdElement);
+                $rowWrapper.append(createdElement);
 
                 if (elementData.type !== presenter.ELEMENT_TYPE.DOT) {
                     cellIndex++;
+                    createdElementsRow.push(createdElement);
                 }
-            })
-            viewWrapper.append(rowWrapper);
-        })
-    }
+
+                if (elementData.type == presenter.ELEMENT_TYPE.EMPTY_BOX || elementData.type == presenter.ELEMENT_TYPE.HELP_BOX) {
+                    presenter.gapElements.push({
+                        x: createdElementsRow.length - 1,
+                        y: presenter.elementsTable.length,
+                        el: createdElement
+                    });
+                }
+            });
+            $viewWrapper.append($rowWrapper);
+            presenter.elementsTable.push(createdElementsRow);
+        });
+    };
 
     function addCellClass(createdElement, cellIndex) {
         $(createdElement).addClass('cell-' + (cellIndex + 1));
     }
 
     presenter.addPosition = function(element, position) {
-        let input = $(element).find(".writing-calculations-input, .container-number")[0];
+        const input = $(element).find(".writing-calculations-input, .container-number")[0];
 
         $(input).attr({
             "row" : position.rowIndex,
@@ -388,17 +597,17 @@
     };
 
     presenter.setCellElementValue = function (row, cell, value) {
-        var inputs = presenter.getInputs();
+        const $inputs = presenter.getInputs();
 
-        for (var i = 0; i &lt; inputs.length; i++) {
-            if ($(inputs[i]).attr("row") === row &amp;&amp; $(inputs[i]).attr("cell") === cell) {
-                $(inputs[i]).val(value)
+        for (let i = 0; i &lt; $inputs.length; i++) {
+            if ($($inputs[i]).attr("row") === row &amp;&amp; $($inputs[i]).attr("cell") === cell) {
+                $($inputs[i]).val(value);
             }
         }
-    }
+    };
 
     presenter.parseValue = function (value) {
-        if (!this.isEmptyBox(value)) {
+        if (!this.isEmptyBox(value) &amp;&amp; !this.isHelpBox(value)) {
             return value;
         }
 
@@ -408,9 +617,10 @@
     };
 
     presenter.createRowWrapper = function(index) {
-        var rowWrapper = $("&lt;div&gt;&lt;/div&gt;");
-        rowWrapper.addClass("wrapper-row row-" + (index + 1));
-        return rowWrapper;
+        const rowWrapper = document.createElement("div");
+        rowWrapper.classList.add("wrapper-row");
+        rowWrapper.classList.add("row-" + (index + 1));
+        return $(rowWrapper);
     };
 
     presenter.createElement = function(type) {
@@ -434,10 +644,24 @@
             case this.ELEMENT_TYPE.DOT:
                 createdElement = this.createWrapperAndContainer("dot", 'wrapper-dot');
                 break;
+            case this.ELEMENT_TYPE.HELP_BOX:
+                createdElement = this.createWrapperAndContainer("helpBox");
+                break;
         }
 
         return createdElement;
     };
+
+    presenter.getContainerType = function ($el) {
+        if ($el.hasClass("container-number")) return presenter.ELEMENT_TYPE.NUMBER;
+        if ($el.hasClass("container-symbol")) return presenter.ELEMENT_TYPE.SYMBOL;
+        if ($el.hasClass("container-emptySpace")) return presenter.ELEMENT_TYPE.EMPTY_SPACE;
+        if ($el.hasClass("container-emptyBox")) return presenter.ELEMENT_TYPE.EMPTY_BOX;
+        if ($el.hasClass("container-line")) return presenter.ELEMENT_TYPE.LINE;
+        if ($el.hasClass("container-dot")) return presenter.ELEMENT_TYPE.DOT;
+        if ($el.hasClass("container-helpBox")) return presenter.ELEMENT_TYPE.HELP_BOX;
+        return -1;
+    }
 
     presenter.createWrapperAndContainer = function(cssClass, wrapperClass) {
         if (!wrapperClass || wrapperClass === undefined) {
@@ -452,16 +676,14 @@
     };
 
     presenter.transformElement = function(element, value, type) {
-        var container = $(element).find("[class*=container]");
+        const $container = $(element).find("[class*=container]");
+        let inputType, input;
         switch(type) {
             case this.ELEMENT_TYPE.EMPTY_SPACE:
                 break;
             case this.ELEMENT_TYPE.EMPTY_BOX:
-                var inputType = "text";
-                if (presenter.useNumericKeyboard) {
-                    inputType = "tel";
-                }
-                var input = $("&lt;input type='" + inputType + "'&gt;");
+                inputType = presenter.useNumericKeyboard ? "tel" : "text";
+                input = $("&lt;input type='" + inputType + "'&gt;");
                 input.addClass("writing-calculations-input");
                 if(!presenter.multisigns){
                     input.attr("maxlength", 1);
@@ -469,30 +691,38 @@
                 if (presenter.useNumericKeyboard) {
                     input.attr("step", "any");
                 }
-                container.append(input);
+                $container.append(input);
                 break;
             case this.ELEMENT_TYPE.LINE:
                 break;
             case this.ELEMENT_TYPE.SYMBOL:
-                container.html(this.convertLaTeX(value));
+                $container.html(this.convertLaTeX(value));
+                $container.data('value',value);
                 break;
             case this.ELEMENT_TYPE.DOT:
-                container.html(value);
+                $container.html(value);
+                break;
+            case this.ELEMENT_TYPE.HELP_BOX:
+                inputType = presenter.useNumericKeyboard ? "tel" : "text";
+                input = $("&lt;input type='" + inputType + "'&gt;");
+                input.addClass("writing-calculations-input");
+                if (presenter.useNumericKeyboard) {
+                    input.attr("step", "any");
+                }
+                input.val(value);
+                $container.append(input);
                 break;
             default:
-                container.html(value);
+                $container.html(value);
         }
-
     };
 
     presenter.convertLaTeX = function (value) {
         if (value === "*") {
             return presenter.signs['Multiplication'];
-        }
-        else if (value === ":" || value === ")") {
+        } else if (value === ":" || value === ")") {
             return presenter.signs['Division'];
-        }
-        else if (value === "+") {
+        } else if (value === "+") {
             return presenter.signs['Addition'];
         } else if (value === "-") {
             return presenter.signs['Subtraction'];
@@ -508,6 +738,7 @@
         if( this.isEmptyBox(element) ) return this.ELEMENT_TYPE.EMPTY_BOX;
         if( this.isLine(element) ) return this.ELEMENT_TYPE.LINE;
         if( this.isDot(element)) return this.ELEMENT_TYPE.DOT;
+        if( this.isHelpBox(element)) return this.ELEMENT_TYPE.HELP_BOX;
     };
 
     presenter.isDot = function(element) {
@@ -515,16 +746,14 @@
     };
 
     /**
-     Check if valid box == will be empty box in run
+     Check if valid empty box == will be empty box in run
      @method isEmptyBox
 
      @param {String} element element HTML
     */
     presenter.isEmptyBox = function(element) {
-        if (element.length &lt; 2) {
-            return false;
-        }
-        if (element[0] !== '[' || element[element.length - 1] !== ']') {
+        if ((element.length &lt; 2)
+            || (element[0] !== '[' || element[element.length - 1] !== ']')) {
             return false;
         }
 
@@ -535,6 +764,22 @@
 
         const content = element.slice(1, element.length - 1);
         return (presenter.isDot(content) || presenter.isIntegerOrFloat(content));
+    };
+
+    /**
+     Check if valid help box
+     @method isHelpBox
+
+     @param {String} element element HTML
+    */
+    presenter.isHelpBox = function(element) {
+        if ((element.length &lt; 2)
+            || (element[0] !== '{' || element[element.length - 1] !== '}')) {
+            return false;
+        }
+
+        const content = element.slice(1, element.length - 1);
+        return (presenter.isDot(content) || presenter.isIntegerOrFloat(content)) || content === "";
     };
 
     presenter.isEmptySpace = function(element) {
@@ -697,44 +942,57 @@
     };
 
     presenter.getInputs = function() {
-        return $(this.$view).find(".writing-calculations-input");
+        return this.$view.find(".writing-calculations-input");
+    }
+
+    presenter.getEmptyBoxesInputs = function() {
+        return this.$view.find(".container-emptyBox .writing-calculations-input");
     };
 
-    presenter.isAllFilled = function() {
-        var inputs = presenter.getInputs();
+    presenter.getHelpBoxesInputs = function() {
+        return this.$view.find(".container-helpBox .writing-calculations-input");
+    };
 
-        for (var i = 0; i &lt; inputs.length; i++) {
-            if ($(inputs[i]).val().length == 0) return false;
+    presenter.isAllEmptyBoxInputsFilled = function() {
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+
+        for (let i = 0; i &lt; $emptyBoxesInputs.length; i++) {
+            if ($($emptyBoxesInputs[i]).val().length == 0) return false;
         }
 
         return true;
     };
+
+    presenter.handleShownAnswers = function () {
+        presenter.isShowAnswersActive &amp;&amp; presenter.hideAnswers();
+        presenter.isGradualShowAnswersActive &amp;&amp; presenter.gradualHideAnswers();
+    }
 
     presenter.setShowErrorsMode = function() {
         if(presenter.isNotActivity){
             return;
         }
 
-        var inputs = $(this.$view).find(".writing-calculations-input");
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+        const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+        disableInputs($helpBoxesInputs);
 
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
+        presenter.handleShownAnswers();
 
         if (!presenter.isCommutativity) {
-            $.each(inputs, function(){
-                var answer = presenter.createAnswer($(this).attr("row"), $(this).attr("cell"), $(this).val());
+            $.each($emptyBoxesInputs, function(){
+                const answer = presenter.createAnswer($(this).attr("row"), $(this).attr("cell"), $(this).val());
 
                 if (ModelValidationUtils.isStringEmpty($(this).val())) {
                     presenter.markEmpty($(this));
-                } else if( presenter.isCorrect(answer) ) {
+                } else if (presenter.isCorrect(answer)) {
                     presenter.markCorrect($(this));
                 } else {
                     presenter.markIncorrect($(this));
                 }
             });
-        } else if (presenter.isAllFilled()) {
-            var isCorrect = presenter.isAllCorrectlyFilled();
+        } else if (presenter.isAllEmptyBoxInputsFilled()) {
+            const isCorrect = presenter.isAllEmptyBoxInputsCorrectlyFilled();
 
             if (isCorrect) {
                 presenter.$view.addClass('correct');
@@ -742,14 +1000,14 @@
                 presenter.$view.addClass('wrong');
             }
 
-            disableAllInputs(inputs);
+            disableInputs($emptyBoxesInputs);
         } else {
-            disableAllInputs(inputs);
+            disableInputs($emptyBoxesInputs);
         }
     };
 
-    function disableAllInputs(inputs) {
-        $(inputs).attr("disabled", "disabled");
+    function disableInputs(inputs) {
+        inputs.attr("disabled", "disabled");
     }
 
     presenter.compareAnswers = function(correctAnswers, userAnswers) {
@@ -825,10 +1083,10 @@
         return wasRowFound;
     };
 
-    presenter.getAllAnswers = function(elements) {
-        var answers = [];
+    presenter.getAllAnswers = function($elements) {
+        const answers = [];
 
-        $.each(elements, function(){
+        $.each($elements, function(){
             if ($(this).hasClass('writing-calculations-input')) {
                 if (answers[$(this).attr("row") - 1] === undefined) {
                     answers[$(this).attr("row") - 1] = [$(this).val()];
@@ -847,9 +1105,9 @@
         return answers;
     };
 
-    presenter.isAllCorrectlyFilled = function() {
-        var elements = $(this.$view).find('.container-number, .writing-calculations-input');
-        var answers = presenter.getAllAnswers(elements);
+    presenter.isAllEmptyBoxInputsCorrectlyFilled = function() {
+        const $elements = this.$view.find('.container-number, .container-emptyBox .writing-calculations-input');
+        const answers = presenter.getAllAnswers($elements);
 
         return presenter.compareAnswers(presenter.answers, answers);
     };
@@ -896,14 +1154,6 @@
         return this.visiblePosition;
     }
 
-    presenter.createAnswer = function(rowIndex, cellIndex, elementValue) {
-        return {
-            rowIndex: parseInt(rowIndex, 10),
-            cellIndex: parseInt(cellIndex, 10),
-            value: presenter.parseValue(elementValue)
-        }
-    };
-
     presenter.markIncorrect = function(element) {
         presenter.markAs(element, "incorrect");
     };
@@ -931,20 +1181,31 @@
 
     presenter.reset = function() {
         this.clean(true, true);
-        var inputs = $(this.$view).find(".writing-calculations-input");
-        if(typeof(presenter.userAnswers) !== "undefined") {
-            $.each(inputs, function(index){
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+        if (typeof(presenter.userAnswers) !== "undefined") {
+            $.each($emptyBoxesInputs, function(index){
                 presenter.userAnswers[index] = '';
+            });
+        }
+
+        const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+        if (typeof(presenter.helpBoxesUserAnswers) !== "undefined") {
+            const defaultValues = presenter.helpBoxesDefaultValues.flat();
+            $.each($helpBoxesInputs, function(index){
+                presenter.helpBoxesUserAnswers[index] = defaultValues[index];
+                $(this).val(presenter.helpBoxesUserAnswers[index]);
             });
         }
 
         presenter.setVisibility(presenter.isVisibleByDefault);
         presenter.isVisible = presenter.isVisibleByDefault;
+        presenter.isScoreSaved = false;
+        presenter.isDisabled = false;
     };
 
     presenter.clean = function(removeMarks, removeValues) {
-        var inputs = $(this.$view).find(".writing-calculations-input");
-        $.each(inputs, function(){
+        const $inputs = presenter.getInputs();
+        $.each($inputs, function(){
             if(removeMarks) {
                 presenter.removeMark($(this));
             }
@@ -968,26 +1229,24 @@
         $(element).val("");
     };
 
-
-    presenter.getInputsData = function() {
-        var inputs = $(this.$view).find(".writing-calculations-input");
-        var inputsData = {
+    presenter.getEmptyBoxesInputsData = function() {
+        const $inputs = presenter.getEmptyBoxesInputs();
+        const inputsData = {
             values : [],
             correctAnswersCount : 0,
             incorrectAnswersCount : 0
         };
 
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
-        $.each(inputs, function () {
-            var value = $(this).val();
+        presenter.handleShownAnswers();
+
+        $.each($inputs, function () {
+            let value = $(this).val();
             value = presenter.parseValue(value);
             inputsData.values.push(value);
 
             if (value === undefined || value === "") return true; // jQuery.each continue
 
-            var answer = presenter.createAnswer($(this).attr("row"), $(this).attr("cell"), $(this).val());
+            const answer = presenter.createAnswer($(this).attr("row"), $(this).attr("cell"), $(this).val());
             if( presenter.isCorrect(answer) ) {
                 inputsData.correctAnswersCount++;
             } else {
@@ -997,29 +1256,53 @@
         return inputsData;
     };
 
+    presenter.getHelpBoxesInputsData = function() {
+        const $inputs = presenter.getHelpBoxesInputs();
+        const inputsData = {
+            values : [],
+        };
+
+        presenter.handleShownAnswers();
+
+        $.each($inputs, function () {
+            let value = $(this).val();
+            value = presenter.parseValue(value);
+            inputsData.values.push(value);
+        });
+        return inputsData;
+    };
+
     presenter.getState = function() {
-        if (presenter.isShowAnswersActive) {
-            presenter.hideAnswers();
-        }
+        presenter.handleShownAnswers();
+
         return JSON.stringify({
-            "inputsData" : this.getInputsData(),
-            "isVisible" : presenter.isVisible
+            "inputsData" : this.getEmptyBoxesInputsData(),
+            "helpBoxesInputsData" : presenter.getHelpBoxesInputsData(),
+            "isVisible" : presenter.isVisible,
         });
     };
 
     presenter.setState = function(stateString) {
         if (ModelValidationUtils.isStringEmpty(stateString)) return;
 
-        var state = JSON.parse(stateString);
+        const state = JSON.parse(stateString);
         if (state.inputsData) {
-            var inputs = $(this.$view).find(".writing-calculations-input");
-            var inputsData = state.inputsData;
-            $.each(inputs, function(index){
+            const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+            const inputsData = state.inputsData;
+            $.each($emptyBoxesInputs, function(index){
                 $(this).val(inputsData.values[index].toString());
             });
         }
 
-        if(state.isVisible != undefined) {
+        if (state.helpBoxesInputsData) {
+            const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+            const helpBoxesInputsData = state.helpBoxesInputsData;
+            $.each($helpBoxesInputs, function(index){
+                $(this).val(helpBoxesInputsData.values[index].toString());
+            });
+        }
+
+        if (state.isVisible != undefined) {
             presenter.isVisible = state.isVisible;
             presenter.setVisibility(presenter.isVisible);
         }
@@ -1030,7 +1313,7 @@
             return 0;
         }
 
-        if (presenter.isShowAnswersActive) {
+        if (presenter.isShowAnswersActive || presenter.isGradualShowAnswersActive) {
             return presenter.currentScore;
         }
         return this.getPoints("correct");
@@ -1041,7 +1324,7 @@
             return 0;
         }
 
-        if (presenter.isShowAnswersActive) {
+        if (presenter.isShowAnswersActive || presenter.isGradualShowAnswersActive) {
             return presenter.currentMaxScore;
         }
         return this.getPoints("all");
@@ -1052,22 +1335,22 @@
             return 0;
         }
 
-        if (presenter.isShowAnswersActive) {
+        if (presenter.isShowAnswersActive || presenter.isGradualShowAnswersActive) {
             return presenter.currentErrorCount;
         }
         return this.getPoints("incorrect");
     };
 
     presenter.getPoints = function(type) {
-        var inputsData = this.getInputsData();
+        const inputsData = this.getEmptyBoxesInputsData();
 
         if (presenter.isCommutativity) {
             switch (type) {
                 case 'correct':
-                    return presenter.isAllCorrectlyFilled() ? 1 : 0;
+                    return presenter.isAllEmptyBoxInputsCorrectlyFilled() ? 1 : 0;
                 case 'incorrect':
-                    if (presenter.isAllFilled()) {
-                        return presenter.isAllCorrectlyFilled() ? 0 : 1;
+                    if (presenter.isAllEmptyBoxInputsFilled()) {
+                        return presenter.isAllEmptyBoxInputsCorrectlyFilled() ? 0 : 1;
                     } else {
                         return 0;
                     }
@@ -1090,7 +1373,6 @@
         }
     };
 
-
     presenter.createEventData = function(value, item, isCorrect) {
         return {
             source : this.model.ID,
@@ -1111,66 +1393,196 @@
         this.playerController = controller;
     };
 
-    presenter.onEventReceived = function (eventName) {
-        if (eventName == "ShowAnswers") {
-            presenter.showAnswers();
-        }
+    presenter.onEventReceived = function (eventName, eventData) {
+        switch (eventName) {
+            case "ShowAnswers":
+                presenter.showAnswers();
+                break;
 
-        if (eventName == "HideAnswers") {
-            presenter.hideAnswers();
+            case "GradualShowAnswers":
+                presenter.gradualShowAnswers(eventData);
+                break;
+
+            case "HideAnswers":
+                presenter.hideAnswers();
+                break;
+
+            case "GradualHideAnswers":
+                presenter.gradualHideAnswers();
+                break;
         }
     };
 
+    presenter.disableInputs = function () {
+        if (presenter.isDisabled) {
+            return;
+        }
+
+        presenter.isDisabled = true;
+        const $inputs = presenter.getInputs();
+        $.each($inputs, function() {
+            $(this).attr("disabled", true);
+        });
+    }
+
+    presenter.enableInputs = function () {
+        presenter.isDisabled = false;
+
+        const $inputs = presenter.getInputs();
+        $.each($inputs, function() {
+            $(this).attr("disabled", false);
+        });
+    }
 
     presenter.showAnswers = function () {
-        if(presenter.isNotActivity){
+        if (presenter.isNotActivity){
             return;
         }
 
         if (presenter.isShowAnswersActive) {
             presenter.hideAnswers();
         }
-        presenter.userAnswers = [];
-        presenter.currentScore = presenter.getScore();
-        presenter.currentErrorCount = presenter.getErrorCount();
-        presenter.currentMaxScore = presenter.getMaxScore();
+
+        presenter.saveCurrentScore();
         presenter.isShowAnswersActive = true;
         presenter.clean(true,false);
-        var inputs = $(this.$view).find(".writing-calculations-input");
-        var correctAnswers = presenter.correctAnswersList;
+        presenter.isDisabled = true;
+        const correctAnswers = presenter.correctAnswersList;
 
-        $.each(inputs, function(index){
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+        $.each($emptyBoxesInputs, function(index){
             $(this).addClass('writing-calculations_show-answers');
             $(this).attr("disabled", true);
             presenter.userAnswers.push($(this).val());
             $(this).val(correctAnswers[index].value);
         });
+
+        const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+        $.each($helpBoxesInputs, function(){
+            $(this).addClass('writing-calculations_show-answers');
+            $(this).attr("disabled", true);
+            presenter.helpBoxesUserAnswers.push($(this).val());
+            $(this).val("");
+        });
     };
 
+    presenter.gradualShowAnswers = function (eventData) {
+        presenter.disableInputs();
+
+        if (eventData.moduleID !== presenter.ID) {
+            return;
+        }
+
+        if (presenter.showAllAnswersInGSA) {
+            presenter.showAnswers();
+            return;
+        }
+
+        if (!presenter.isGradualShowAnswersActive) {
+            const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+            $.each($helpBoxesInputs, function(){
+                $(this).addClass('writing-calculations_show-answers');
+                $(this).attr("disabled", true);
+                presenter.helpBoxesUserAnswers.push($(this).val());
+                $(this).val("");
+            });
+        }
+        presenter.isGradualShowAnswersActive = true;
+        presenter.saveCurrentScore();
+        const input = presenter.getEmptyBoxesInputs()[eventData.item];
+
+        $(input).addClass('writing-calculations_show-answers');
+        presenter.userAnswers.push($(input).val());
+        $(input).val(presenter.correctAnswersList[eventData.item].value);
+    }
+
     presenter.hideAnswers = function () {
-        if(presenter.isNotActivity || !presenter.isShowAnswersActive) {
+        if (presenter.isNotActivity || !presenter.isShowAnswersActive) {
             return;
         }
 
         presenter.isShowAnswersActive = false;
-        var inputs = $(this.$view).find(".writing-calculations-input");
-        $.each(inputs, function(index){
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+        $.each($emptyBoxesInputs, function(index){
             $(this).val(presenter.userAnswers[index]);
             $(this).removeClass('writing-calculations_show-answers');
             $(this).attr("disabled", false);
         });
+
+        const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+        $.each($helpBoxesInputs, function(index){
+            $(this).val(presenter.helpBoxesUserAnswers[index]);
+            $(this).removeClass('writing-calculations_show-answers');
+            $(this).attr("disabled", false);
+        });
+
+        presenter.userAnswers = [];
+        presenter.helpBoxesUserAnswers = [];
+        presenter.isDisabled = false;
     };
+
+    presenter.gradualHideAnswers = function () {
+        if (presenter.showAllAnswersInGSA &amp;&amp; presenter.isShowAnswersActive) {
+            presenter.hideAnswers();
+            return;
+        }
+
+        presenter.enableInputs();
+
+        if (presenter.isNotActivity || !presenter.isGradualShowAnswersActive) {
+            return;
+        }
+
+        presenter.isGradualShowAnswersActive = false;
+        presenter.isScoreSaved = false;
+
+        const $emptyBoxesInputs = presenter.getEmptyBoxesInputs();
+        presenter.userAnswers.forEach((userAnswer, index) =&gt; {
+            const input = $emptyBoxesInputs[index];
+            $(input).val(presenter.userAnswers[index]);
+            $(input).removeClass('writing-calculations_show-answers');
+        });
+
+        const $helpBoxesInputs = presenter.getHelpBoxesInputs();
+        $.each($helpBoxesInputs, function(index){
+            $(this).val(presenter.helpBoxesUserAnswers[index]);
+            $(this).removeClass('writing-calculations_show-answers');
+        });
+
+        presenter.userAnswers = [];
+        presenter.helpBoxesUserAnswers = [];
+    };
+
+    presenter.saveCurrentScore = function () {
+        if (presenter.isScoreSaved) {
+            return;
+        }
+        presenter.currentScore = presenter.getScore();
+        presenter.currentErrorCount = presenter.getErrorCount();
+        presenter.currentMaxScore = presenter.getMaxScore();
+
+        presenter.isScoreSaved = true;
+    }
+
+    presenter.getActivitiesCount = function () {
+        return presenter.showAllAnswersInGSA ? 1 : presenter.getEmptyBoxesInputs().length;
+    }
 
     presenter.validateModelValue = function (modelValue) {
         const rows = presenter.convertStringToArray(modelValue);
-        let elementsData = [];
+        const elementsData = [];
 
         for (let rowIndex = 0; rowIndex &lt; rows.length; rowIndex++) {
             let row = rows[rowIndex];
 
-            const validatedBracketsNumber = validateBracketsNumber(row, rowIndex);
-            if (!validatedBracketsNumber.isValid) {
-                return validatedBracketsNumber;
+            const validatedAnswerBracketsNumber = validateAnswerBracketsNumber(row, rowIndex);
+            if (!validatedAnswerBracketsNumber.isValid) {
+                return validatedAnswerBracketsNumber;
+            }
+
+            const validatedHelpBracketsNumber = validateHelpBracketsNumber(row, rowIndex);
+            if (!validatedHelpBracketsNumber.isValid) {
+                return validatedHelpBracketsNumber;
             }
 
             let cellBoxIndex = 0;
@@ -1180,21 +1592,45 @@
                 let elementLength = 1;
                 let elementData = {};
 
-                const isEndOfGap = elementValue === ']';
-                if (isEndOfGap) {
+                const isEndOfAnswerGap = elementValue === ']';
+                if (isEndOfAnswerGap) {
                     return getErrorObject("V02", {rowIndex: rowIndex + 1});
                 }
 
-                const isStartOfGap = elementValue === '[';
-                if (isStartOfGap) {
-                    const validatedGapLength = validateGapLength(row, rowIndex, startingIndex);
+                const isEndOfHelpGap = elementValue === '}';
+                if (isEndOfHelpGap) {
+                    return getErrorObject("V07", {rowIndex: rowIndex + 1});
+                }
+
+                const isStartOfAnswerGap = elementValue === '[';
+                const isStartOfHelpGap = elementValue === '{';
+                if (isStartOfHelpGap) {
+                    const validatedGapLength = validateHelpGapLength(row, rowIndex, startingIndex);
                     if (!validatedGapLength.isValid) {
                         return validatedGapLength;
                     }
 
                     elementLength = validatedGapLength.value;
                     elementValue = row.slice(startingIndex, startingIndex + elementLength);
+                    elementData = presenter.createElementData(rowIndex + 1, ++cellBoxIndex, elementValue, true);
+                    if (elementData.type !== presenter.ELEMENT_TYPE.HELP_BOX) {
+                        return getErrorObject("V08", {rowIndex: rowIndex + 1, value: elementData.rawValue});
+                    }
 
+                    if (presenter.helpBoxesDefaultValues[rowIndex] === undefined) {
+                        presenter.helpBoxesDefaultValues[rowIndex] = [];
+                    }
+
+                    const answer = elementData.createAnswer();
+                    presenter.helpBoxesDefaultValues[rowIndex].push(answer.value);
+                } else if (isStartOfAnswerGap) {
+                    const validatedGapLength = validateAnswerGapLength(row, rowIndex, startingIndex);
+                    if (!validatedGapLength.isValid) {
+                        return validatedGapLength;
+                    }
+
+                    elementLength = validatedGapLength.value;
+                    elementValue = row.slice(startingIndex, startingIndex + elementLength);
                     elementData = presenter.createElementData(rowIndex + 1, ++cellBoxIndex, elementValue, true);
                     if (elementData.type !== presenter.ELEMENT_TYPE.EMPTY_BOX) {
                         return getErrorObject("V05", {rowIndex: rowIndex + 1, value: elementData.rawValue});
@@ -1204,7 +1640,7 @@
                         presenter.answers[rowIndex] = [];
                     }
 
-                    let answer = elementData.createAnswer();
+                    const answer = elementData.createAnswer();
                     presenter.answers[rowIndex].push(answer.value);
                     presenter.correctAnswersList.push(answer);
                 } else {
@@ -1227,7 +1663,7 @@
         return getCorrectObject(elementsData);
     }
 
-    function validateBracketsNumber(row, rowIndex) {
+    function validateAnswerBracketsNumber(row, rowIndex) {
         const errorMessageSubstitutions = {rowIndex: rowIndex + 1};
         const openingBracketsCount = row.split('').filter(x =&gt; x === '[').length;
         const closingBracketsCount = row.split('').filter(x =&gt; x === ']').length;
@@ -1239,20 +1675,32 @@
         return getCorrectObject(openingBracketsCount + closingBracketsCount);
     }
 
-    function validateGapLength(rowString, rowIndex, startIndex) {
+    function validateHelpBracketsNumber(row, rowIndex) {
+        const errorMessageSubstitutions = {rowIndex: rowIndex + 1};
+        const openingBracketsCount = row.split('').filter(x =&gt; x === '{').length;
+        const closingBracketsCount = row.split('').filter(x =&gt; x === '}').length;
+        if (openingBracketsCount &gt; closingBracketsCount) {
+            return getErrorObject("V06", errorMessageSubstitutions);
+        } else if (openingBracketsCount &lt; closingBracketsCount) {
+            return getErrorObject("V07", errorMessageSubstitutions);
+        }
+        return getCorrectObject(openingBracketsCount + closingBracketsCount);
+    }
+
+    function validateAnswerGapLength(rowString, rowIndex, startIndex) {
         const errorMessageSubstitutions = {rowIndex: rowIndex + 1};
 
-        const nextClosingBracketIndex = rowString.indexOf(']', startIndex);
-        if (nextClosingBracketIndex === -1) {
+        const nextClosingAnswerBracketIndex = rowString.indexOf(']', startIndex);
+        if (nextClosingAnswerBracketIndex === -1) {
             return getErrorObject("V01", errorMessageSubstitutions);
         }
 
-        const nextOpeningBracketIndex = rowString.indexOf('[', startIndex + 1);
-        if (nextOpeningBracketIndex !== - 1 &amp;&amp; nextOpeningBracketIndex &lt;= nextClosingBracketIndex) {
+        const nextOpeningAnswerBracketIndex = rowString.indexOf('[', startIndex + 1);
+        if (nextOpeningAnswerBracketIndex !== - 1 &amp;&amp; nextOpeningAnswerBracketIndex &lt;= nextClosingAnswerBracketIndex) {
             return getErrorObject("V01", errorMessageSubstitutions);
         }
 
-        const length = nextClosingBracketIndex - startIndex + 1;
+        const length = nextClosingAnswerBracketIndex - startIndex + 1;
         if (length === 2) {
             return getErrorObject("V03", errorMessageSubstitutions);
         }
@@ -1260,6 +1708,23 @@
         if (!presenter.multisigns &amp;&amp; length !== 3) {
             return getErrorObject("V04", errorMessageSubstitutions);
         }
+        return getCorrectObject(length);
+    }
+
+    function validateHelpGapLength(rowString, rowIndex, startIndex) {
+        const errorMessageSubstitutions = {rowIndex: rowIndex + 1};
+
+        const nextClosingHelpBracketIndex = rowString.indexOf('}', startIndex);
+        if (nextClosingHelpBracketIndex === -1) {
+            return getErrorObject("V06", errorMessageSubstitutions);
+        }
+
+        const nextOpeningHelpBracketIndex = rowString.indexOf('{', startIndex + 1);
+        if (nextOpeningHelpBracketIndex !== - 1 &amp;&amp; nextOpeningHelpBracketIndex &lt;= nextClosingHelpBracketIndex) {
+            return getErrorObject("V07", errorMessageSubstitutions);
+        }
+
+        const length = nextClosingHelpBracketIndex - startIndex + 1;
         return getCorrectObject(length);
     }
 
@@ -1293,6 +1758,289 @@
             value: value
         };
     }
+
+    presenter.setWCAGStatus = function(isOn) {
+        presenter.isWCAGOn = isOn;
+    }
+
+     presenter.keyboardController = function(keycode, isShift, event) {
+        if (!presenter.isGapFocused) event.preventDefault();
+        switch (keycode) {
+            case 9: // TAB
+                if (isShift) {
+                    prevGap();
+                    if (!presenter.isGapFocused) readCurrentCell();
+                } else {
+                    nextGap();
+                    if (!presenter.isGapFocused) readCurrentCell();
+                }
+                break;
+            case 13: //ENTER
+                if (isShift) {
+                    exitModuleInTTS();
+                } else {
+                    enter();
+                    readCurrentCell();
+                }
+                break;
+            case 32: // SPACE
+                break;
+            case 38: // UP
+                prevRow();
+                if (!presenter.isGapFocused) readCurrentCell();
+                break;
+            case 40: // DOWN
+                nextRow();
+                if (!presenter.isGapFocused) readCurrentCell();
+                break;
+            case 37: // LEFT
+                prevColumn();
+                if (!presenter.isGapFocused) readCurrentCell();
+                break;
+            case 39: // RIGHT
+                nextColumn();
+                if (!presenter.isGapFocused) readCurrentCell();
+                break;
+            case 27: // ESC
+                escape(event);
+                break;
+        }
+    }
+
+    function nextRow() {
+        if (!presenter.isWCAGOn || presenter.isGapFocused) return;
+        if (presenter.keyboardState.y + 1 &lt; presenter.elementsTable.length) {
+            presenter.keyboardState.y += 1;
+            if (presenter.keyboardState.y != -1 &amp;&amp; presenter.keyboardState.x &gt;= presenter.elementsTable[presenter.keyboardState.y].length) {
+                presenter.keyboardState.x = presenter.elementsTable[presenter.keyboardState.y].length - 1;
+            }
+        }
+        updateGapIndex();
+        updateKeyboardNavigationSelectionClass();
+    }
+
+    function prevRow() {
+        if (!presenter.isWCAGOn || presenter.isGapFocused) return;
+        if (presenter.keyboardState.y - 1 &gt; -2) {
+            presenter.keyboardState.y -= 1;
+            if (presenter.keyboardState.y == -1) {
+                presenter.keyboardState.x = 0;
+            } else if (presenter.keyboardState.x &gt;= presenter.elementsTable[presenter.keyboardState.y].length) {
+                presenter.keyboardState.x = presenter.elementsTable[presenter.keyboardState.y].length - 1;
+            }
+        }
+        updateGapIndex();
+        updateKeyboardNavigationSelectionClass();
+    }
+
+    function nextColumn() {
+        if (!presenter.isWCAGOn || presenter.isGapFocused) return;
+        if (presenter.keyboardState.y != -1  &amp;&amp; presenter.keyboardState.x + 1 &lt; presenter.elementsTable[presenter.keyboardState.y].length) {
+            presenter.keyboardState.x += 1;
+        }
+        updateGapIndex();
+        updateKeyboardNavigationSelectionClass();
+    }
+
+    function prevColumn() {
+        if (!presenter.isWCAGOn || presenter.isGapFocused) return;
+        if (presenter.keyboardState.y != -1  &amp;&amp; presenter.keyboardState.x &gt; 0) {
+            presenter.keyboardState.x -= 1;
+        }
+        updateGapIndex();
+        updateKeyboardNavigationSelectionClass();
+    }
+
+    function nextGap() {
+        if (presenter.isGapFocused) return;
+        if (presenter.keyboardState.gapIndex + 1 &lt; presenter.gapElements.length) {
+            presenter.keyboardState.gapIndex += 1;
+            var gap = presenter.gapElements[presenter.keyboardState.gapIndex];
+            presenter.keyboardState.x = gap.x;
+            presenter.keyboardState.y = gap.y;
+            updateKeyboardNavigationSelectionClass();
+        }
+    }
+
+    function prevGap() {
+        if (presenter.isGapFocused) return;
+        if (presenter.keyboardState.gapIndex - 1 &gt; -1 &amp;&amp; presenter.gapElements.length &gt; 0) {
+            presenter.keyboardState.gapIndex -= 1;
+            var gap = presenter.gapElements[presenter.keyboardState.gapIndex];
+            presenter.keyboardState.x = gap.x;
+            presenter.keyboardState.y = gap.y;
+            updateKeyboardNavigationSelectionClass();
+        }
+    }
+
+    function updateGapIndex() {
+        presenter.keyboardState.gapIndex = -1;
+        for (var i = 0; i &lt; presenter.gapElements.length; i++) {
+            if (presenter.keyboardState.x == presenter.gapElements[i].x &amp;&amp; presenter.keyboardState.y == presenter.gapElements[i].y) {
+                presenter.keyboardState.gapIndex = i;
+                break;
+            }
+        }
+    }
+
+        function enter() {
+            if (presenter.keyboardState.y != -1) {
+                var $gap = presenter.elementsTable[presenter.keyboardState.y][presenter.keyboardState.x].find('input.writing-calculations-input');
+                if ($gap.length &gt; 0) {
+                    presenter.isGapFocused = true;
+                    $gap.addClass('keyboard_navigation_active_element');
+                    $gap.focus();
+                }
+            }
+        }
+
+        function escape(event) {
+            if (presenter.isGapFocused) {
+                if (event) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                }
+                var $gap = presenter.elementsTable[presenter.keyboardState.y][presenter.keyboardState.x].find('input.writing-calculations-input');
+                if ($gap.length &gt; 0) {
+                    setTimeout(()=&gt;{
+                        presenter.isGapFocused = false;
+                    }, 0);
+                    $gap.removeClass('keyboard_navigation_active_element');
+                    $gap.blur();
+                }
+            } else {
+                exitModuleInTTS();
+            }
+        }
+
+        function exitModuleInTTS() {
+            presenter.isGapFocused = false;
+            presenter.keyboardState.x = 0;
+            presenter.keyboardState.y = -1;
+            presenter.keyboardState.gapIndex = -1;
+            updateKeyboardNavigationSelectionClass();
+        }
+
+    function updateKeyboardNavigationSelectionClass() {
+        presenter.$view.find('.'+presenter.KEYBOARD_SELECTED_CLASS).removeClass(presenter.KEYBOARD_SELECTED_CLASS);
+        if (presenter.keyboardState.y &gt;= 0) {
+            presenter.elementsTable[presenter.keyboardState.y][presenter.keyboardState.x].children().first().addClass(presenter.KEYBOARD_SELECTED_CLASS);
+        }
+    }
+
+    function readCurrentCell() {
+        presenter.readCell(presenter.keyboardState.x, presenter.keyboardState.y);
+    }
+
+    presenter.getCellTitle = function (x, y) {
+        var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        var title = "";
+        do {
+            var mod = x % 26;
+            title = alphabet[mod] + " " + title;
+            x -= mod;
+            x = x / 26 - 1;
+        } while (x &gt;= 0);
+        title += (y+1);
+        return title;
+    }
+
+    presenter.readCell = function(x, y) {
+        if (!presenter.isWCAGOn) return;
+        var data = [];
+        if (y &lt; 0) {
+            data.push(window.TTSUtils.getTextVoiceObject(presenter.descriptionOfOperation, presenter.langTag)); //TODO
+        } else {
+            data.push(window.TTSUtils.getTextVoiceObject(presenter.getCellTitle(x,y)));
+
+            var container = presenter.elementsTable[y][x].children().first();
+            var containerType = presenter.getContainerType(container);
+
+            switch(containerType) {
+                case presenter.ELEMENT_TYPE.NUMBER:
+                    data.push(window.TTSUtils.getTextVoiceObject(container.html(), presenter.langTag));
+                    break;
+                case presenter.ELEMENT_TYPE.SYMBOL:
+                    var value = container.data('value');
+                    if (value === "*") {
+                        data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.multiplicationSign));
+                    } else if (value === ":" || value === ")") {
+                        data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.divisionSign));
+                    } else if (value === "+") {
+                        data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.additionSign));
+                    } else if (value === "-") {
+                        data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.subtractionSign));
+                    } else if (value === "#") {
+                        data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.equalsSign));
+                    }
+                    break;
+                case presenter.ELEMENT_TYPE.EMPTY_BOX:
+                    data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.gap));
+                    var input = container.find('input');
+                    if (input.length &gt; 0) {
+                        var inputVoices = presenter.getTextVoicesFromInput(input);
+                        data = data.concat(inputVoices);
+                    }
+                    break;
+                case presenter.ELEMENT_TYPE.LINE:
+                    data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.line));
+                    break;
+                case presenter.ELEMENT_TYPE.HELP_BOX:
+                    data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.additionalGap));
+                    var input = container.find('input');
+                    if (input.length &gt; 0) {
+                        var inputVoices = presenter.getTextVoicesFromInput(input);
+                        data = data.concat(inputVoices);
+                    }
+                    break;
+                default:
+                    break;
+            }
+
+            var nextSibling = presenter.elementsTable[y][x].next();
+            if (nextSibling.length &gt; 0 &amp;&amp; presenter.getContainerType(nextSibling.children().first()) == presenter.ELEMENT_TYPE.DOT) {
+                data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.decimalSeparator));
+            }
+        }
+        presenter.speak(data);
+    }
+
+    presenter.getTextVoicesFromInput = function(inputElement) {
+        var data =[];
+        var value = inputElement.val();
+        if (value.length == 0) {
+            data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.empty));
+        } else {
+            data.push(window.TTSUtils.getTextVoiceObject(value, presenter.langTag));
+        }
+        if (inputElement.hasClass('correct')) {
+            data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.correct));
+        } else if (inputElement.hasClass('incorrect')) {
+            data.push(window.TTSUtils.getTextVoiceObject(presenter.speechTexts.wrong));
+        }
+        return data;
+    };
+
+    presenter.getTextToSpeechOrNull = function (playerController) {
+        if (playerController) {
+            return playerController.getModule('Text_To_Speech1');
+        }
+
+        return null;
+    };
+
+    presenter.speak = function (data) {
+        if (data.length == 0) return;
+        var tts = presenter.getTextToSpeechOrNull(presenter.playerController);
+
+        if (tts &amp;&amp; presenter.isWCAGOn) {
+            tts.speak(data);
+        }
+    }
+
+    presenter.isDeactivationBlocked = function() {
+        return presenter.isGapFocused;
+    };
 
     return presenter;
 }

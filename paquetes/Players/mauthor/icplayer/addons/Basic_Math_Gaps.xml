@@ -698,18 +698,21 @@
     };
 
     presenter.getErrorCount = function(){
+        const wasShowAnswersActive = presenter.configuration.isShowAnswersActive;
         if (presenter.configuration.isShowAnswersActive) {
             presenter.hideAnswers();
         }
 
+        const errorCount = _getErrorCount();
+        wasShowAnswersActive &amp;&amp; presenter.showAnswers();
+        return errorCount;
+    };
+
+    function _getErrorCount () {
         if (presenter.cantCheck()) {
             return 0;
         }
 
-        return _getErrorCount();
-    };
-
-    function _getErrorCount () {
         var validated = presenter.validateScore();
 
         if (presenter.configuration.isEquation) {
@@ -856,10 +859,17 @@
     };
 
     presenter.getScore = function () {
+        const wasShowAnswersActive = presenter.configuration.isShowAnswersActive;
         if (presenter.configuration.isShowAnswersActive) {
             presenter.hideAnswers();
         }
 
+        const score = _getScore();
+        wasShowAnswersActive &amp;&amp; presenter.showAnswers();
+        return score;
+    };
+
+    function _getScore() {
         if (presenter.cantCheck()) {
             return 0;
         }
@@ -879,7 +889,7 @@
         } else {
             return validated.validGapsCount;
         }
-    };
+    }
 
     presenter.cantCheck = function () {
         if (presenter.configuration.isNotActivity
@@ -892,6 +902,10 @@
     };
 
     presenter.getState = function(){
+        const wasShowAnswersActive = presenter.configuration.isShowAnswersActive;
+        if (presenter.configuration.isShowAnswersActive) {
+            presenter.hideAnswers();
+        }
         var state = {
             'values' : presenter.gapsContainer.getValues(),
             'sources': presenter.gapsContainer.getSources(),
@@ -900,6 +914,7 @@
             'droppedElements' : presenter.gapsContainer.getDroppedElements()
         };
 
+        wasShowAnswersActive &amp;&amp; presenter.showAnswers();
         return JSON.stringify(state);
     };
 
@@ -1438,7 +1453,7 @@
         if ((presenter.configuration.useNumericKeyboard)) {
             $inputGap.attr("step", "any");
         }
-
+        $inputGap.attr("autocomplete", "off");
         return $inputGap;
     };
 

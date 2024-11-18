@@ -407,11 +407,8 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
         initializeOpenButton();
         presenter.initializeCloseButton();
 
-        presenter.view.addEventListener('DOMNodeRemoved', function onDOMNodeRemoved_eKeyboard (ev) {
-            if (ev.target === this) {
-                presenter.destroy();
-            }
-        });
+        MutationObserverService.createDestroyObserver(model["ID"], presenter.destroy, presenter.view);
+        MutationObserverService.setObserver();
 
         var mathJaxDeferred = new jQuery.Deferred(),
             mathJaxProcessEnded = mathJaxDeferred.promise();
@@ -495,6 +492,7 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
                             var $el = $(element);
                             $el.addClass('ui-keyboard-lockedinput');
                             $el.attr('readonly', true);
+                            $el.attr('inputmode', "none");
                         }
                     );
                 }
@@ -551,10 +549,6 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
             openButtonElement.style.display = 'block';
             actualizeOpenButtonPosition($(lastClickedElement));
         } else {
-            if (MobileUtils.isMobileUserAgent(navigator.userAgent) &amp;&amp; presenter.configuration.lockInput) {
-                // hides native keyboard
-                document.activeElement.blur();
-            }
             presenter.createEKeyboard(this, presenter.display);
             $(this).trigger('showKeyboard');
         }
@@ -613,6 +607,7 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
 
         $(closeButtonElement).hide();
         $(lastClickedElement).removeAttr("readonly");
+        $(lastClickedElement).removeAttr("inputmode");
         var keyboard = $(lastClickedElement).data('keyboard');
         if (keyboard !== undefined) {
             keyboard.accept();
@@ -634,7 +629,7 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
                 at : presenter.configuration.positionAt.value,
                 at2 : presenter.configuration.positionAt.value,
                 offset : presenter.configuration.offset.value,
-                collision: 'flip'
+                collision: 'fit'
             },
 
                     // preview added above keyboard if true, original input/textarea used if false
@@ -920,7 +915,7 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
 
     function showOpenButtonCallback() {
         hideOpenButton();
-
+        presenter.configuration.$inputs.attr("inputmode", "none");
         presenter.enable();
 
         escClicked = false;
@@ -1039,6 +1034,7 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
         presenter.configuration.$inputs.on('focusout', focusoutCallBack);
         presenter.configuration.$inputs.removeClass('ui-keyboard-input ui-keyboard-input-current');
         presenter.configuration.$inputs.removeAttr("readonly");
+        presenter.configuration.$inputs.removeAttr("inputmode");
     };
 
     presenter.enable = function () {
@@ -1100,7 +1096,6 @@ button.ui-keyboard-accept.ui-keyboard-invalid-input:hover { background: #a00; }
         });
 
         document.removeEventListener('mousedown', presenter.clickedOutsideCallback);
-        presenter.view.removeEventListener('DOMNodeRemoved', presenter.destroy);
         $(presenter.keyboardWrapper).remove();
         $(openButtonElement).remove();
     };

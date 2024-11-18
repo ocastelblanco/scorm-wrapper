@@ -110,6 +110,7 @@
     var inactiveClass = "file-sender-inactive";
 
     var sendFileEventType = "sendFile";
+    var credentialsConfig = "same-origin";
 
 
     function presenterLogic(view, model, isPreview) {
@@ -182,6 +183,9 @@
     presenter.setPlayerController = function(controller) {
         presenter.playerController = controller;
         presenter.pageIndex = presenter.playerController.getCurrentPageIndex();
+        if (presenter.playerController.getRequestsConfig().shouldIncludeCredentials()) {
+            credentialsConfig = "include";
+        }
 
         presenter.loadContext(10);
     };
@@ -429,10 +433,9 @@
     }
 
     presenter.fetchSessionJWTToken = function() {
-        var result = fetch('/api/v2/jwt/session_token', {
+        return fetch('/api/v2/jwt/session_token', {
             method: 'GET'
         });
-        return result;
     }
 
     presenter.showTargetDialog = function() {
@@ -534,14 +537,16 @@
                     method: 'GET',
                     headers: {
                         'Authorization': 'JWT ' + json.token,
-                    }
+                    },
+                    credentials: credentialsConfig
                 }).then(result =&gt; result.json()).then(
                     success =&gt; fetch(success["upload_url"], {
-                       method: 'POST',
-                       headers: {
-                           'Authorization': 'JWT ' + json.token
-                       },
-                       body: formData
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'JWT ' + json.token
+                        },
+                        body: formData,
+                        credentials: credentialsConfig
                     })
                ).then(result =&gt; result.json()).then(
                     success =&gt; {
@@ -714,6 +719,10 @@
                 }
             }
 
+            if (presenter.isPlayerInCrossDomain() &amp;&amp; !presenter.isMauthor()) {
+                const _scrollTop = $(window.parent.document.getElementsByClassName('mdl-layout'))?.scrollTop();
+                scrollTop = _scrollTop !== undefined ? _scrollTop : scrollTop;
+            }
 
             if ($(window).scrollTop() &gt; popupTop &amp;&amp; isPopup) {
                 topPosition += ($(window).scrollTop() - popupTop);
@@ -740,6 +749,16 @@
                 }
             }
         }catch(e){console.log(e)}
+    };
+
+    presenter.isPlayerInCrossDomain = function () {
+        return presenter.playerController &amp;&amp; !presenter.playerController.isPlayerInCrossDomain();
+    }
+
+    presenter.isMauthor = function () {
+        const names = ["lorepo", "mauthor"];
+        const origin = window.origin;
+        return names.some((name) =&gt; origin.includes(name));
     };
 
     presenter.closeDialogEventHandler = function() {

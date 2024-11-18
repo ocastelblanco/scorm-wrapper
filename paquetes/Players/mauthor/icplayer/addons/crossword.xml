@@ -44,6 +44,8 @@
                 <property name="OutOf" nameLabel="crossword_speech_text_out_of" type="string"/>
             </property>
 		</property>
+        <property name="printable" nameLabel="printable_name_label" type="{No, Don't randomize, Randomize}"/>
+        <property name="isSplitInPrintBlocked" nameLabel="printable_block_split_label" type="boolean"/>
 	</model>
 <css>.crossword_container {
     position: absolute;
@@ -56,6 +58,11 @@
     position: relative;
 }
 
+.printable_crossword_container .printable_cell_container {
+    float: left;
+    position: relative;
+}
+
 .crossword_container .cell {
     position: absolute;
     top: 0px;
@@ -64,7 +71,21 @@
     bottom: 0px;
 }
 
+.printable_crossword_container .printable_cell {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    right: 0px;
+    bottom: 0px;
+    display: flex;
+    place-content: center;
+}
+
 .crossword_container .cell_letter {
+    background: white;
+}
+
+.printable_crossword_container .printable_cell_letter {
     background: white;
 }
 
@@ -84,6 +105,10 @@
     background: black;
 }
 
+.printable_crossword_container .printable_cell_container_blank {
+    background: black;
+}
+
 .crossword_container .cell_letter input {
     position: absolute;
     top: 0;
@@ -97,11 +122,49 @@
     text-transform: uppercase;
 }
 
+.printable_crossword_container .printable_cell_letter_content {
+    text-align: center;
+    background: transparent;
+    border: none;
+    -webkit-appearance: none;
+    text-transform: uppercase;
+    margin-top: auto;
+    margin-bottom: auto;
+    font-size: large;
+}
+
 .crossword_container .cell .word_number {
     position: absolute;
     top: 2px;
     left: 2px;
     font-size: 6pt;
+}
+
+.printable_crossword_container .printable_cell .printable_word_number {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    font-size: 6pt;
+}
+
+.printable_crossword_container .printable_sign_valid {
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: 2px;
+}
+
+.printable_crossword_container .printable_sign_invalid {
+    margin-top: auto;
+    margin-bottom: auto;
+    margin-left: 2px;
+}
+
+.printable_crossword_container .printable_sign_valid::after {
+    content: " \2714";
+}
+
+.printable_crossword_container .printable_sign_invalid::after {
+    content: " \2716";
 }
 </css><view/><preview/><presenter>function Addoncrossword_create(){
     var presenter = function() {};
@@ -110,12 +173,15 @@
     var eventBus;
     var originalFieldValue = "";
 
+    presenter.ID               = null;
+    presenter.$view            = null;
+    presenter.crossword        = null;
+
     presenter.rowCount         = null;
     presenter.columnCount      = null;
     presenter.cellHeight       = null;
     presenter.cellWidth        = null;
     presenter.maxScore         = null;
-    presenter.id               = null;
     presenter.isVisible        = true;
     presenter.showAllAnswersInGradualShowAnswersMode;
     presenter.isGradualShowAnswersActive = false;
@@ -128,10 +194,17 @@
     presenter.wordNumbersHorizontal = false;
     presenter.wordNumbersVertical = false;
     presenter.disableAutomaticWordNumbering = false;
+    presenter.blockWrongAnswers = false;
     presenter.markedColumnIndex = 0;
     presenter.markedRowIndex = 0;
     presenter.maxTabIndex = 0;
     presenter.areUserAnswersSaved = false;
+    presenter.correctAnswers = [];
+
+    presenter.printableController = null;
+    presenter.printableState = null;
+    presenter.printableStateMode = null;
+    presenter.GSAcounter = null;
 
     var enableMoveToNextField = false;
 
@@ -186,7 +259,8 @@
 
     presenter.VALIDATION_MODE = {
         COUNT_SCORE: 0,
-        SHOW_ERRORS: 1
+        SHOW_ERRORS: 1,
+        CHECK_ANSWERS: 2
     };
 
     presenter.isModelValid = true;
@@ -211,6 +285,20 @@
         CELL_LETTER: "cell_letter",
         CELL_VALID: "cell_valid",
         CELL_INVALID: "cell_invalid",
+        PRINTABLE: "printable",
+        PRINTABLE_ADDON: "printable_addon_crossword",
+        PRINTABLE_CELL_LETTER_CONTENT: "printable_cell_letter_content",
+        PRINTABLE_SIGN_VALID: "printable_sign_valid",
+        PRINTABLE_SIGN_INVALID: "printable_sign_invalid",
+        PRINTABLE_CELL_VALID: "printable_cell_valid",
+        PRINTABLE_CELL_INVALID: "printable_cell_invalid",
+    };
+
+    presenter.PRINTABLE_STATE_MODE = {
+        EMPTY: 0,
+        SHOW_ANSWERS: 1,
+        SHOW_USER_ANSWERS: 2,
+        CHECK_ANSWERS: 3
     };
 
     presenter.showErrorMessage = function(message, substitutions) {
@@ -229,7 +317,8 @@
     };
 
     presenter.prepareGrid = function(model) {
-        presenter.tabIndexBase = ($("div.crossword_container").length * 5000) + 5000;
+        const elementPath = "div." + (isInPrintableStateMode() ? presenter.CSS_CLASSES.PRINTABLE + "_" : "") + "crossword_container";
+        presenter.tabIndexBase = ($(elementPath).length * 5000) + 5000;
         presenter.maxScore = 0;
         presenter.crossword = [];
 
@@ -307,8 +396,9 @@
     }
 
     presenter.isHorizontalWordBegin = function(i, j) {
-        if(!presenter.wordNumbersHorizontal)
+        if(!presenter.wordNumbersHorizontal) {
             return false;
+        }
 
         return (
             // Skip empty cells
@@ -322,8 +412,9 @@
     };
 
     presenter.isVerticalWordBegin = function(i, j) {
-        if(!presenter.wordNumbersVertical)
+        if(!presenter.wordNumbersVertical) {
             return false;
+        }
 
         return (
             // Skip empty cells
@@ -466,14 +557,28 @@
             cellInput.value = "";
         }
         if (isOk) {
-            var result = presenter.validateWord(pos);
-            if (result.horizontalResult) {
+            const result = presenter.validateWord(pos);
+            const isLetterInVerticalWord = result.verticalResult ?
+                presenter.letterIsInWord(result.verticalResult.start, result.verticalResult.end, pos) : false;
+            const isLetterInHorizontalWord = result.horizontalResult ?
+                presenter.letterIsInWord(result.horizontalResult.start, result.horizontalResult.end, pos) : false;
+
+            if (result.horizontalResult &amp;&amp; isLetterInHorizontalWord) {
                 presenter.sendCorrectWordEvent(result.horizontalResult.word, result.horizontalResult.item);
             }
-            if (result.verticalResult) {
+            if (result.verticalResult &amp;&amp; isLetterInVerticalWord) {
                 presenter.sendCorrectWordEvent(result.verticalResult.word, result.verticalResult.item);
             }
         }
+    };
+
+    presenter.letterIsInWord = function (startPoint, endPoints, letterPosition) {
+        const startCoordinates = startPoint.split(':');
+        const endCoordinates = endPoints.split(':');
+        const isInXAxis = +startCoordinates[0] &lt;= letterPosition.x &amp;&amp; +endCoordinates[0] &gt;= letterPosition.x;
+        const isInYAxis = +startCoordinates[1] &lt;= letterPosition.y &amp;&amp; +endCoordinates[1] &gt;= letterPosition.y;
+
+        return isInXAxis &amp;&amp; isInYAxis;
     };
 
     presenter.onCellClick = function(event) {
@@ -544,6 +649,7 @@
             presenter.setVerticalDirection();
         }
     }
+
     presenter.analyzeDirectionOfMove = function (currentCellInput) {
         var $currentCellInput = $(currentCellInput);
         var currentPosition = getPositionOfCellInputElement($currentCellInput);
@@ -706,21 +812,44 @@
 
     function getPreviousTabIndexEditableCellPositionOfCellInput(cellInput) {
         const newTabIndex = cellInput.tabIndex - 1;
-        return getPositionOfCellInputElementWithTabIndex(newTabIndex);
+        return getPositionOfCellInputElementWithTabIndex(newTabIndex, true);
     }
 
-    function getPositionOfCellInputElementWithTabIndex(tabIndex) {
+    function getPositionOfCellInputElementWithTabIndex(tabIndex, isShiftDown = false) {
         if (tabIndex &lt; presenter.tabIndexBase || tabIndex &gt;= presenter.maxTabIndex) {
             return;
         }
 
-        var newCellInputElement = findCellInputElement(tabIndex);
+        let newCellInputElement;
+        if (!presenter.isWCAGOn) {
+            newCellInputElement = presenter.getNewCellInputElement(tabIndex, isShiftDown);
+        } else {
+            newCellInputElement = findCellInputElement(tabIndex);
+        }
+
+        if (!newCellInputElement.length) {
+            return;
+        }
+
         var newPosition = getPositionOfCellInputElement($(newCellInputElement));
         if (!isPositionValid(newPosition)) {
             return;
         }
 
         return newPosition;
+    }
+
+    presenter.getNewCellInputElement = function (tabIndex, isShiftDown) {
+        let newCellInputElement = findCellInputElement(tabIndex);
+        let isDisabled = $(newCellInputElement).prop('disabled')
+        let newTabIndex = tabIndex;
+        while (newTabIndex &gt;= presenter.tabIndexBase &amp;&amp; isDisabled &amp;&amp; newTabIndex &lt; presenter.maxTabIndex) {
+            newTabIndex = isShiftDown ? newTabIndex - 1 : newTabIndex + 1
+            newCellInputElement = findCellInputElement(newTabIndex);
+            isDisabled = $(newCellInputElement).prop('disabled');
+        }
+
+        return newCellInputElement;
     }
 
     function findCellInputElement(tabIndex) {
@@ -908,52 +1037,68 @@
     presenter.createGrid = function() {
         var wordNumberCounter = 1;
 
-        var gridContainer = $('&lt;div class="crossword_container"&gt;&lt;/div&gt;');
-        gridContainer
-            .css({ width:      presenter.columnCount * presenter.cellWidth + 'px',
-                height:     presenter.rowCount * presenter.cellHeight + 'px',
-                marginLeft: -1 * Math.round(presenter.columnCount * presenter.cellWidth / 2) + 'px',
-                marginTop:  -1 * Math.round(presenter.rowCount * presenter.cellHeight / 2) + 'px' });
+        var gridContainer = $('&lt;div&gt;&lt;/div&gt;');
+        addClass(gridContainer, "crossword_container");
+        let containerWidth = presenter.columnCount * presenter.cellWidth;
+        let containerHeight = presenter.rowCount * presenter.cellHeight;
+        let containerMarginLeft = Math.round(presenter.columnCount * presenter.cellWidth / 2);
+        let containerMarginTop = Math.round(presenter.rowCount * presenter.cellHeight / 2);
+        if (isInPrintableStateMode()) {
+            gridContainer.css({
+                width: containerWidth + 'px',
+                height: containerHeight + 'px',
+            });
+        } else {
+            gridContainer.css({
+                width: containerWidth + 'px',
+                height: containerHeight + 'px',
+                marginLeft: -1 * containerMarginLeft + 'px',
+                marginTop: -1 * containerMarginTop + 'px'
+            });
+        }
 
         var tabIndexOffset = 0;
         for(var i = 0; i &lt; presenter.rowCount; i++) {
             for(var j = 0; j &lt; presenter.columnCount; j++) {
-                var cellContainer = $('&lt;div class="cell_container"&gt;&lt;/div&gt;');
+                var cellContainer = $('&lt;div&gt;&lt;/div&gt;');
+                addClass(cellContainer, "cell_container");
                 cellContainer.css({ width:  presenter.cellWidth + 'px',
                     height: presenter.cellHeight + 'px' });
 
-                var cell = $('&lt;div class="cell"&gt;&lt;/div&gt;')
-                    .addClass('cell_' + i + 'x' + j)
-                    .addClass('cell_row_' + i)
-                    .addClass('cell_column_' + j);
+                var cell = $('&lt;div&gt;&lt;/div&gt;');
+                addClass(cell, "cell");
+                addClass(cell, 'cell_' + i + 'x' + j);
+                addClass(cell, 'cell_row_' + i);
+                addClass(cell, 'cell_column_' + j);
 
-                if(presenter.markedRowIndex &gt; 0 &amp;&amp; presenter.markedRowIndex == i+1) {
-                    cell.addClass('cell_row_marked');
+                if (presenter.markedRowIndex &gt; 0 &amp;&amp; presenter.markedRowIndex == i+1) {
+                    addClass(cell, "cell_row_marked");
                 }
 
-                if(presenter.markedColumnIndex &gt; 0 &amp;&amp; presenter.markedColumnIndex == j+1) {
-                    cell.addClass('cell_column_marked');
+                if (presenter.markedColumnIndex &gt; 0 &amp;&amp; presenter.markedColumnIndex == j+1) {
+                    addClass(cell, "cell_column_marked");
                 }
 
                 cellContainer.append(cell);
-
-                if(presenter.crossword[i][j] == ' ') {
-                    cell.addClass('cell_blank');
-                    cellContainer.addClass('cell_container_blank');
+                if (presenter.crossword[i][j] == ' ') {
+                    addClass(cell, "cell_blank");
+                    addClass(cellContainer, "cell_container_blank");
                 } else {
-                    cell.addClass('cell_letter');
-                    cellContainer.addClass('cell_container_letter');
+                    addClass(cell, "cell_letter");
+                    addClass(cellContainer, "cell_container_letter");
 
                     var input = $('&lt;input type="text" maxlength="2" size="1"/&gt;');
 
                     if (presenter.crossword[i][j][0] === '!') {
                         input
+                            .attr('tabIndex', presenter.tabIndexBase + tabIndexOffset++)
+                            .focus(presenter.onCellInputFocus)
                             .val(presenter.crossword[i][j][1])
                             .prop('disabled', true);
 
-                        cell.addClass("cell_constant_letter");
+                        addClass(cell, "cell_constant_letter");
                         cell.addClass("");
-                    } else {
+                    } else if (!isInPrintableStateMode()){
                         input
                             .attr('tabIndex', presenter.tabIndexBase + tabIndexOffset++)
                             .keyup(presenter.onCellInputKeyUp)
@@ -962,6 +1107,10 @@
                             .mouseup(presenter.onCellInputMouseUp)
                             .focusout(presenter.onCellInputFocusOut)
                             .click(presenter.onCellClick);
+                    } else {
+                        input
+                            .prop('disabled', true)
+                            .attr('tabIndex', presenter.tabIndexBase + tabIndexOffset++);
                     }
 
                     if(presenter.preview) {
@@ -979,18 +1128,19 @@
                     if (horizontalWordBegin) presenter.maxScore++;
                     if (verticalWordBegin) presenter.maxScore++;
 
-                    if(horizontalWordBegin || verticalWordBegin) {
-                        cell.addClass('cell_word_begin');
+                    if (horizontalWordBegin || verticalWordBegin) {
+                        addClass(cell, "cell_word_begin");
 
-                        if(horizontalWordBegin)
-                            cell.addClass('cell_word_begin_horizontal');
+                        if (horizontalWordBegin)
+                            addClass(cell, "cell_word_begin_horizontal");
 
-                        if(verticalWordBegin)
-                            cell.addClass('cell_word_begin_vertical');
+                        if (verticalWordBegin)
+                            addClass(cell, "cell_word_begin_vertical");
 
-                        if(!presenter.disableAutomaticWordNumbering) {
+                        if (!presenter.disableAutomaticWordNumbering) {
                             const sanitizedText = window.xssUtils.sanitize(wordNumberCounter++);
-                            const wordNumber = $('&lt;div class="word_number"&gt;&lt;/div&gt;').html(sanitizedText);
+                            const wordNumber = $('&lt;div&gt;&lt;/div&gt;').html(sanitizedText);
+                            addClass(wordNumber, "word_number");
 
                             cell.append(wordNumber);
                         }
@@ -1061,21 +1211,22 @@
 
                 // Additional classes
                 if(j == 0) {
-                    cell.addClass('cell_first_in_row');
+                    addClass(cell, "cell_first_in_row");
                 } else if(j == presenter.columnCount - 1) {
-                    cell.addClass('cell_last_in_row');
+                    addClass(cell, "cell_last_in_row");
                 }
 
                 if(i == 0) {
-                    cell.addClass('cell_first_in_column');
+                    addClass(cell, "cell_first_in_column");
                 } else if(i == presenter.rowCount - 1) {
-                    cell.addClass('cell_last_in_column');
+                    addClass(cell, "cell_last_in_column");
                 }
 
                 gridContainer.append(cellContainer);
             }
         }
 
+        presenter.updateMaxScore();
         presenter.$view.append(gridContainer);
     };
 
@@ -1085,6 +1236,59 @@
             errorMessage: errorMessage,
             errorMessageSubstitutions: errorMessageSubstitutions
         }
+    }
+
+    presenter.updateMaxScore = function () {
+        presenter.maxScore -= presenter.getNumberOfExampleWords();
+    }
+
+    presenter.getNumberOfExampleWords = function () {
+        let exampleWordsCounter = 0;
+        for (let i = 0; i &lt; presenter.rowCount; i++) {
+            for (let j = 0; j &lt; presenter.columnCount; j++) {
+                if (presenter.isHorizontalWordBegin(i, j)) {
+                    let exampleLettersCounter = 0;
+                    let letterCounter = 0;
+
+                    for (let k = j; k &lt; presenter.columnCount; k++) {
+                        if (presenter.crossword[i][k] === ' ') {
+                            break;
+                        }
+
+                        if (presenter.crossword[i][k].match('![a-zA-Z]*?')) {
+                            exampleLettersCounter++;
+                        }
+                        letterCounter++;
+                    }
+
+                    if (letterCounter === exampleLettersCounter) {
+                        exampleWordsCounter++;
+                    }
+                }
+
+                if (presenter.isVerticalWordBegin(i, j)) {
+                    let exampleLettersCounter = 0;
+                    let letterCounter = 0;
+
+                    for (let k = i; k &lt; presenter.rowCount; k++) {
+                        if (presenter.crossword[k][j] === ' ') {
+                            break;
+                        }
+
+                        if (presenter.crossword[k][j].match('![a-zA-Z]*?')) {
+                            exampleLettersCounter++;
+                        }
+                        letterCounter++;
+                    }
+
+                    if (letterCounter === exampleLettersCounter) {
+                        exampleWordsCounter++;
+                    }
+                }
+            }
+        }
+
+        return exampleWordsCounter;
     }
 
     presenter.readConfiguration = function(model) {
@@ -1347,14 +1551,17 @@
     };
 
     presenter.validate = function(mode) {
-        var wordValid, k, l, score, markedCell;
-        var filled = false;
-        
+        const classPrefix = '.' + (isInPrintableStateMode() ? presenter.CSS_CLASSES.PRINTABLE + '_' : '');
+        let wordValid, k, l, score, markedCell;
+        let filled = false;
+
         if (presenter.isShowAnswersActive &amp;&amp; mode == presenter.VALIDATION_MODE.SHOW_ERRORS) {
             presenter.hideAnswers();
-            for(var i = 0; i &lt; presenter.rowCount; i++) {
-                for(var j = 0; j &lt; presenter.columnCount; j++) {
-                    if(presenter.$view.find('.cell_' + i + 'x' + j + ' input').val() != '' &amp;&amp; typeof(presenter.$view.find('.cell_' + i + 'x' + j + ' input').val()) !== "undefined" &amp;&amp; presenter.crossword[i][j][0] !== '!') {
+            for (let i = 0; i &lt; presenter.rowCount; i++) {
+                for (let j = 0; j &lt; presenter.columnCount; j++) {
+                    if (presenter.$view.find(classPrefix + 'cell_' + i + 'x' + j + ' input').val() != ''
+                        &amp;&amp; typeof(presenter.$view.find(classPrefix + 'cell_' + i + 'x' + j + ' input').val()) !== "undefined"
+                        &amp;&amp; presenter.crossword[i][j][0] !== '!') {
                         filled = true;
                     }
                 }
@@ -1365,7 +1572,7 @@
         }
 
         if(mode == presenter.VALIDATION_MODE.SHOW_ERRORS) {
-            presenter.$view.find(".cell_letter input").attr('disabled', true);
+            presenter.$view.find(classPrefix + "cell_letter input").attr('disabled', true);
         } else if(mode == presenter.VALIDATION_MODE.COUNT_SCORE) {
             score = 0;
         }
@@ -1374,24 +1581,36 @@
             for(j = 0; j &lt; presenter.columnCount; j++) {
                 if(presenter.isHorizontalWordBegin(i, j)) {
                     wordValid = true;
+                    let exampleLettersCounter = 0;
+                    let letterCounter = 0;
 
                     for(k = j; k &lt; presenter.columnCount; k++) {
                         if(presenter.crossword[i][k] == ' ') {
                             break;
                         }
 
-                        if(presenter.crossword[i][k] != presenter.$view.find('.cell_' + i + 'x' + k + " input").attr('value').toUpperCase() &amp;&amp; presenter.crossword[i][k][0] !== '!') {
+                        if(presenter.crossword[i][k] != presenter.$view.find(classPrefix + 'cell_' + i + 'x' + k + " input").attr('value').toUpperCase()
+                            &amp;&amp; presenter.crossword[i][k][0] !== '!') {
                             wordValid = false;
                         }
+
+                        if(presenter.crossword[i][k].match('![a-zA-Z]*?')) {
+                            exampleLettersCounter++;
+                        }
+                        letterCounter++;
+                    }
+
+                    if (wordValid &amp;&amp; letterCounter === exampleLettersCounter &amp;&amp; mode !== presenter.VALIDATION_MODE.CHECK_ANSWERS) {
+                        wordValid = false;
                     }
 
                     if(mode == presenter.VALIDATION_MODE.COUNT_SCORE &amp;&amp; wordValid) {
                         score++;
                     }
 
-                    if(mode == presenter.VALIDATION_MODE.SHOW_ERRORS) {
+                    if(mode === presenter.VALIDATION_MODE.SHOW_ERRORS || mode === presenter.VALIDATION_MODE.CHECK_ANSWERS) {
                         for(l = j; l &lt; k; l++) {
-                            markedCell = presenter.$view.find('.cell_' + i + 'x' + l);
+                            markedCell = presenter.$view.find(classPrefix + 'cell_' + i + 'x' + l);
                             if(!markedCell.hasClass(presenter.CSS_CLASSES.CELL_VALID))
                                 markedCell.addClass(
                                     wordValid
@@ -1406,24 +1625,35 @@
 
                 if(presenter.isVerticalWordBegin(i, j)) {
                     wordValid = true;
+                    let exampleLettersCounter = 0;
+                    let letterCounter = 0;
 
                     for(k = i; k &lt; presenter.rowCount; k++) {
                         if(presenter.crossword[k][j] == ' ') {
                             break;
                         }
 
-                        if(presenter.crossword[k][j] != presenter.$view.find('.cell_' + k + 'x' + j + " input").attr('value').toUpperCase() &amp;&amp; presenter.crossword[k][j][0] !== '!') {
+                        if(presenter.crossword[k][j] != presenter.$view.find(classPrefix + 'cell_' + k + 'x' + j + " input").attr('value').toUpperCase() &amp;&amp; presenter.crossword[k][j][0] !== '!') {
                             wordValid = false;
                         }
+
+                         if(presenter.crossword[k][j].match('![a-zA-Z]*?')) {
+                            exampleLettersCounter++;
+                        }
+                        letterCounter++;
+                    }
+
+                    if (wordValid &amp;&amp; letterCounter === exampleLettersCounter &amp;&amp; mode !== presenter.VALIDATION_MODE.CHECK_ANSWERS) {
+                        wordValid = false;
                     }
 
                     if(mode == presenter.VALIDATION_MODE.COUNT_SCORE &amp;&amp; wordValid) {
                         score++;
                     }
 
-                    if(mode == presenter.VALIDATION_MODE.SHOW_ERRORS) {
+                    if(mode === presenter.VALIDATION_MODE.SHOW_ERRORS || mode === presenter.VALIDATION_MODE.CHECK_ANSWERS) {
                         for(l = i; l &lt; k; l++) {
-                            markedCell = presenter.$view.find('.cell_' + l + 'x' + j);
+                            markedCell = presenter.$view.find(classPrefix + 'cell_' + l + 'x' + j);
                             if(!markedCell.hasClass(presenter.CSS_CLASSES.CELL_VALID))
                                 markedCell.addClass(
                                     wordValid
@@ -1449,7 +1679,7 @@
             return;
         }
 
-        presenter.validate(presenter.VALIDATION_MODE.SHOW_ERRORS);
+        presenter.validate(presenter.VALIDATION_MODE.CHECK_ANSWERS);
     };
 
     presenter.setWorkMode = function() {
@@ -1532,9 +1762,13 @@
     };
 
     presenter.isAttempted = function() {
-        var countedConstantLetters = 0;
+        let classPrefix = "cell";
+        if (isInPrintableStateMode()) {
+            classPrefix = presenter.CSS_CLASSES.PRINTABLE + "_" + classPrefix;
+        }
 
-        jQuery.each(presenter.$view.find('.cell input'), function() {
+        var countedConstantLetters = 0;
+        jQuery.each(presenter.$view.find(`.${classPrefix} input`), function() {
             if (!ModelValidationUtils.isStringEmpty($(this).val())) countedConstantLetters++;
         });
 
@@ -1543,14 +1777,19 @@
 
     presenter.getScore = function() {
         const restoreState = presenter.isShowAnswersActive;
+        const wasGradualShowAnswersActive = presenter.isGradualShowAnswersActive;
 
-        if (presenter.isShowAnswersActive) {
+        if (presenter.isShowAnswersActive || presenter.isGradualShowAnswersActive) {
             presenter.hideAnswers();
         }
         var score = presenter.validate(presenter.VALIDATION_MODE.COUNT_SCORE);
         var finalScore = presenter.isAttempted() ? score : 0;
         if (restoreState) {
             presenter.showAnswers();
+        }
+
+        if (wasGradualShowAnswersActive) {
+            this.restoreGradualShowAnswers();
         }
         return finalScore;
     };
@@ -1561,7 +1800,8 @@
 
     presenter.getErrorCount = function() {
         const restoreState = presenter.isShowAnswersActive;
-        if (presenter.isShowAnswersActive) {
+        const wasGradualShowAnswersActive = presenter.isGradualShowAnswersActive;
+        if (presenter.isShowAnswersActive || presenter.isGradualShowAnswersActive) {
             presenter.hideAnswers();
         }
         var score = presenter.validate(presenter.VALIDATION_MODE.COUNT_SCORE),
@@ -1569,6 +1809,10 @@
         var finalErrorCount = presenter.isAttempted() ? errorCount : 0;
         if (restoreState) {
             presenter.showAnswers();
+        }
+
+        if (wasGradualShowAnswersActive) {
+            this.restoreGradualShowAnswers();
         }
         return finalErrorCount
     };
@@ -1633,6 +1877,13 @@
         playerController = controller;
     };
 
+    /**
+     * @param controller (PrintableController)
+     */
+    presenter.setPrintableController = function (controller) {
+        presenter.printableController = controller;
+    };
+
     presenter.executeCommand = function (name, params) {
         if (presenter.configuration.isErrorMode) return;
 
@@ -1681,6 +1932,8 @@
         var i, k, horizontalResult = {
             word: '',
             item: 0,
+            start: '',
+            end: '',
         };
         var verticalResult = {...horizontalResult};
 
@@ -1697,6 +1950,10 @@
                         horizontalResult.word = '';
                         break;
                     }
+                    if (!horizontalResult.start) {
+                        horizontalResult.start = `${k}:${max_y}`;
+                    }
+                    horizontalResult.end = `${k}:${max_y}`;
                     horizontalResult.word += presenter.crossword[max_y][k];
                 }
                 horizontalResult.item = presenter.$view.find('.cell_' + max_y + 'x' + i +' .word_number').text();
@@ -1717,6 +1974,10 @@
                         verticalResult.word = '';
                         break;
                     }
+                    if (!verticalResult.start) {
+                        verticalResult.start = `${max_x}:${k}`;
+                    }
+                    verticalResult.end = `${max_x}:${k}`;
                     verticalResult.word += presenter.crossword[k][max_x];
                 }
                 verticalResult.item = presenter.$view.find('.cell_' + i + 'x' + max_x +' .word_number').text();
@@ -1785,19 +2046,40 @@
     };
 
     presenter.gradualShowAnswers = function (data) {
-        presenter.isGradualShowAnswersActive = true;
-        if (data.moduleID !== presenter.addonID) return;
-        if (!presenter.isWordNumbersCorrect()) return;
+        if (data.moduleID !== presenter.addonID) {
+            return;
+        }
 
+        if (!presenter.isWordNumbersCorrect()) {
+            return;
+        }
+
+        presenter.isGradualShowAnswersActive = true;
         if (presenter.showAllAnswersInGradualShowAnswersMode === "True") {
             presenter.showAnswers();
         } else {
             presenter.$view.find(".cell_letter input").addClass('crossword_cell_show-answers');
             const itemIndex = parseInt(data.item, 10);
+            presenter.GSAcounter = itemIndex;
             const answerData = presenter.correctAnswers[itemIndex];
 
-            if(itemIndex === 0) presenter.prepareCrosswordForGSA();
+            if (itemIndex === 0) presenter.prepareCrosswordForGSA();
             presenter.fillRowGaps(answerData);
+        }
+    }
+
+    presenter.restoreGradualShowAnswers = function () {
+        presenter.isGradualShowAnswersActive = true;
+        if (presenter.showAllAnswersInGradualShowAnswersMode === "True") {
+            presenter.showAnswers();
+        } else {
+            for (let i = 0; i &lt;= presenter.GSAcounter; i++) {
+                presenter.$view.find(".cell_letter input").addClass('crossword_cell_show-answers');
+                const answerData = presenter.correctAnswers[i];
+
+                if (i === 0) presenter.prepareCrosswordForGSA();
+                presenter.fillRowGaps(answerData);
+            }
         }
     }
 
@@ -1817,28 +2099,38 @@
     }
 
     presenter.replaceUserAnswersByModelAnswers = function () {
+        let classPrefix = "cell_";
+        if (isInPrintableStateMode()) {
+            classPrefix = presenter.CSS_CLASSES.PRINTABLE + "_" + classPrefix;
+        }
+
         for (let row = 0; row &lt; presenter.rowCount; row++) {
             for (let column = 0; column &lt; presenter.columnCount; column++) {
-                presenter.$view.find('.cell_' + row + 'x' + column + ' input')
-                    .val(presenter.crossword[row][column]
-                        .replaceAll("!",""));
+                let $cellInputs = presenter.$view.find(`.${classPrefix}${row}x${column} input`);
+                $cellInputs.val(presenter.crossword[row][column].replaceAll("!",""));
             }
         }
     }
 
     presenter.replaceAnswersBySavedUserAnswers = function () {
+        let classPrefix = "cell_";
+        if (isInPrintableStateMode()) {
+            classPrefix = presenter.CSS_CLASSES.PRINTABLE + "_" + classPrefix;
+        }
+
         for (let row = 0; row &lt; presenter.rowCount; row++) {
             for (let column = 0; column &lt; presenter.columnCount; column++) {
                 if (!presenter.crossword[row][column][0].includes('!')) {
-                    presenter.$view.find(`.cell_${row}x${column} input`)
-                        .val(presenter.userAnswers[row][column])
-                        .attr('disabled', false);
+                    let $cellInputs = presenter.$view.find(`.${classPrefix}${row}x${column} input`);
+                    $cellInputs.val(presenter.userAnswers[row][column]);
+                    if (!isInPrintableStateMode()) {
+                        $cellInputs.attr('disabled', false);
+                    }
                 }
             }
         }
         presenter.areUserAnswersSaved = false;
     }
-
 
     presenter.fillRowGaps = function (answerData) {
         const answer = answerData.answer.replaceAll("!","");
@@ -1958,12 +2250,11 @@
     };
 
     CrosswordKeyboardController.prototype.moveToFirstElement = function () {
-        var cellPosition;
+        let cellPosition;
         if (presenter.isWCAGOn) {
             cellPosition = presenter.correctAnswers[0]["position"];
         } else {
-            var firstElement = findCellInputElement(presenter.tabIndexBase);
-            cellPosition = getPositionOfCellInputElement($(firstElement));
+            cellPosition = getPositionOfCellInputElement($(presenter.getFirstEditableCell()));
         }
         if (!isPositionValid(cellPosition)) {
             return;
@@ -1987,6 +2278,20 @@
         }
         moveToNextEditableTabIndexCellInput(event);
     };
+
+    presenter.getFirstEditableCell = function () {
+        let firstElement = findCellInputElement(presenter.tabIndexBase);
+        let isDisabled = $(firstElement).prop('disabled');
+        if (isDisabled) {
+            let tabIndex = presenter.tabIndexBase
+            while (isDisabled &amp;&amp; tabIndex &lt; presenter.maxTabIndex) {
+                firstElement = findCellInputElement(++tabIndex);
+                isDisabled = $(firstElement).prop('disabled');
+            }
+        }
+
+        return firstElement
+    }
 
     function moveToNextEditableTabIndexCellInput(event, blurCurrentOnAbsenceOfNext = false) {
         _moveToCellInputWithGivenPosition(
@@ -2137,7 +2442,11 @@
         var currentCellInput = presenter.keyboardControllerObject.keyboardNavigationActive
             ? presenter.keyboardControllerObject.getCurrentInputElement()
             : event.target;
-        if (!$(currentCellInput).val()) {
+
+        const hasValue = $(currentCellInput).val();
+        const isDisabled = $(currentCellInput).prop('disabled');
+
+        if (hasValue &amp;&amp; isDisabled || !hasValue) {
             var nextCellPosition = getNextCellPositionForBackspaceAction(currentCellInput);
             if (!nextCellPosition) {
                 return;
@@ -2160,7 +2469,7 @@
     function getNextCellPositionForBackspaceAction(currentCellInput) {
         if (presenter.isTabIndexDirection() || presenter.isDirectionNotSet()) {
             const previousTabIndex = currentCellInput.tabIndex - 1;
-            return getPositionOfCellInputElementWithTabIndex(previousTabIndex);
+            return getPositionOfCellInputElementWithTabIndex(previousTabIndex, true);
         }
 
         const currentCellPosition = getPositionOfCellInputElement($(currentCellInput));
@@ -2389,6 +2698,219 @@
 
         return null;
     };
+
+    presenter.setPrintableState = function(state) {
+        if (state === null || ModelValidationUtils.isStringEmpty(state))
+            return;
+
+        presenter.printableState = JSON.parse(state);
+    }
+
+    presenter.getPrintableHTML = function (model, showAnswers) {
+        chosePrintableStateMode(showAnswers);
+        const snapshot = createSnapshotOfVariables();
+
+        createPrintableBaseView(model);
+        modifyViewAccordingToPrintableStateMode();
+        const printableHTML = presenter.$view[0].outerHTML;
+
+        restoreSnapshotOfVariables(snapshot);
+        presenter.printableStateMode = null;
+
+        return printableHTML;
+    };
+
+    function createPrintableBaseView(model) {
+        model = presenter.upgradeModel(model);
+
+        presenter.$view = $('&lt;div&gt;&lt;/div&gt;');
+        presenter.$view.attr("id", model.ID);
+        presenter.$view.addClass(presenter.CSS_CLASSES.PRINTABLE_ADDON);
+
+        presenter.printableConfiguration = presenter.readConfiguration(model);
+        if (presenter.printableConfiguration.isError) {
+            presenter.showErrorMessage(
+                presenter.printableConfiguration.errorMessage,
+                presenter.printableConfiguration.errorMessageSubstitutions
+            );
+            presenter.destroyCommands();
+            return;
+        }
+
+        presenter.prepareGrid(model);
+        presenter.prepareCorrectAnswers();
+        presenter.createGrid();
+    }
+
+    function chosePrintableStateMode(showAnswers) {
+        if (presenter.printableState) {
+            if (showAnswers)
+                presenter.printableStateMode = presenter.PRINTABLE_STATE_MODE.CHECK_ANSWERS;
+            else
+                presenter.printableStateMode = presenter.PRINTABLE_STATE_MODE.SHOW_USER_ANSWERS;
+        } else {
+            if (showAnswers)
+                presenter.printableStateMode = presenter.PRINTABLE_STATE_MODE.SHOW_ANSWERS;
+            else
+                presenter.printableStateMode = presenter.PRINTABLE_STATE_MODE.EMPTY;
+        }
+    }
+
+    function isInPrintableStateMode() {
+        return presenter.printableStateMode !== null;
+    }
+
+    function modifyViewAccordingToPrintableStateMode() {
+        switch (presenter.printableStateMode) {
+            case presenter.PRINTABLE_STATE_MODE.CHECK_ANSWERS:
+                updateViewToCheckAnswersInPrintableStateMode();
+                break;
+            case presenter.PRINTABLE_STATE_MODE.SHOW_USER_ANSWERS:
+                updateViewToShowUserAnswersInPrintableStateMode();
+                break;
+            case presenter.PRINTABLE_STATE_MODE.SHOW_ANSWERS:
+                updateViewToShowAnswersInPrintableStateMode();
+                break;
+            case presenter.PRINTABLE_STATE_MODE.EMPTY:
+                updateViewToEmptyStateInPrintableStateMode();
+                break;
+        }
+        replaceInputElementsByPrintableDivs();
+    }
+
+    function updateViewToCheckAnswersInPrintableStateMode() {
+        setUserAnswersFromPrintableState();
+        presenter.replaceAnswersBySavedUserAnswers();
+
+        if (!presenter.isAttempted()) {
+            return;
+        }
+        validateForPrintable();
+    }
+
+    function validateForPrintable() {
+        presenter.validate(presenter.VALIDATION_MODE.SHOW_ERRORS);
+        for (let row = 0; row &lt; presenter.rowCount; row++) {
+            for (let column = 0; column &lt; presenter.columnCount; column++) {
+                let $cell = presenter.$view.find(`.${presenter.CSS_CLASSES.PRINTABLE}_cell_${row}x${column}`);
+                if ($cell.hasClass(presenter.CSS_CLASSES.CELL_VALID)) {
+                    $cell.append(getPrintableGapSignHTML(true));
+                    $cell.removeClass(presenter.CSS_CLASSES.CELL_VALID);
+                    $cell.addClass(presenter.CSS_CLASSES.PRINTABLE_CELL_VALID);
+                } else if ($cell.hasClass(presenter.CSS_CLASSES.CELL_INVALID)) {
+                    $cell.append(getPrintableGapSignHTML(false));
+                    $cell.removeClass(presenter.CSS_CLASSES.CELL_INVALID);
+                    $cell.addClass(presenter.CSS_CLASSES.PRINTABLE_CELL_INVALID);
+                }
+            }
+        }
+    }
+
+    function getPrintableGapSignHTML(isCorrectAnswer) {
+        const $sign = $("&lt;span&gt;&lt;/span&gt;");
+        if (isCorrectAnswer) {
+            $sign.addClass(presenter.CSS_CLASSES.PRINTABLE_SIGN_VALID);
+        } else {
+            $sign.addClass(presenter.CSS_CLASSES.PRINTABLE_SIGN_INVALID);
+        }
+        return $sign;
+    }
+
+    function updateViewToShowUserAnswersInPrintableStateMode() {
+        setUserAnswersFromPrintableState();
+        presenter.replaceAnswersBySavedUserAnswers();
+    }
+
+    function setUserAnswersFromPrintableState() {
+        presenter.userAnswers = [];
+
+        let cells;
+        if (presenter.printableState.hasOwnProperty("cells")) {
+            cells = presenter.printableState.cells;
+        } else {
+            cells = presenter.printableState;
+        }
+        let counter = 0;
+        for (let i = 0; i &lt; presenter.rowCount; i++) {
+            let row = [];
+            for (let j = 0; j &lt; presenter.columnCount; j++) {
+                row.push(cells[counter]);
+                counter++;
+            }
+            presenter.userAnswers.push(row);
+        }
+    }
+
+    function updateViewToShowAnswersInPrintableStateMode() {
+        presenter.replaceUserAnswersByModelAnswers();
+    }
+
+    function updateViewToEmptyStateInPrintableStateMode() {}
+
+    function replaceInputElementsByPrintableDivs() {
+        presenter.$view.find(".printable_cell_letter input").replaceWith(function() {
+            let $cellContent = $('&lt;div&gt;' + $(this).val() + '&lt;/div&gt;');
+            $cellContent.addClass(presenter.CSS_CLASSES.PRINTABLE_CELL_LETTER_CONTENT);
+            return $cellContent
+        });
+    }
+
+    function createSnapshotOfVariables() {
+        return {
+            crossword: presenter.crossword,
+            rowCount: presenter.rowCount,
+            columnCount: presenter.columnCount,
+            cellHeight: presenter.cellHeight,
+            cellWidth: presenter.cellWidth,
+            blankCellsBorderStyle: presenter.blankCellsBorderStyle,
+            blankCellsBorderWidth: presenter.blankCellsBorderWidth,
+            blankCellsBorderColor: presenter.blankCellsBorderColor,
+            letterCellsBorderStyle: presenter.letterCellsBorderStyle,
+            letterCellsBorderWidth: presenter.letterCellsBorderWidth,
+            letterCellsBorderColor: presenter.letterCellsBorderColor,
+            wordNumbersHorizontal: presenter.wordNumbersHorizontal,
+            wordNumbersVertical: presenter.wordNumbersVertical,
+            showAllAnswersInGradualShowAnswersMode: presenter.showAllAnswersInGradualShowAnswersMode,
+            disableAutomaticWordNumbering: presenter.disableAutomaticWordNumbering,
+            blockWrongAnswers: presenter.blockWrongAnswers,
+            isVisibleByDefault: presenter.isVisibleByDefault,
+            markedColumnIndex: presenter.markedColumnIndex,
+            markedRowIndex: presenter.markedRowIndex,
+            autoNavigationMode: autoNavigationMode,
+
+            $view: presenter.$view,
+            tabIndexBase: presenter.tabIndexBase,
+            maxTabIndex: presenter.maxTabIndex,
+            numberOfConstantLetters: presenter.numberOfConstantLetters,
+            maxScore: presenter.maxScore,
+            areUserAnswersSaved: presenter.areUserAnswersSaved,
+            configuration: {...presenter.configuration},
+            correctAnswers: [...presenter.correctAnswers]
+        }
+    }
+
+    function restoreSnapshotOfVariables(snapshot) {
+        Object.keys(snapshot).forEach(function(key) {
+            if (presenter.hasOwnProperty(key)) {
+                presenter[key] = snapshot[key];
+            } else {
+                switch (key.toString()) {
+                    case "autoNavigationMode":
+                        autoNavigationMode = snapshot[key];
+                        break;
+                    default:
+                        break;
+                }
+            }
+        });
+    }
+
+    function addClass($element, className) {
+        if (isInPrintableStateMode()) {
+            className = presenter.CSS_CLASSES.PRINTABLE + "_" + className;
+        }
+        $element.addClass(className);
+    }
 
     return presenter;
 }

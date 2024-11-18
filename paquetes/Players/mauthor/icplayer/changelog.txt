@@ -1,3 +1,241 @@
+2024-11-07 Fixed Positioning Utils to work when player is in cross domain
+2024-11-07 Fixed impact of enable and disable commands on Image Source when active TTS
+2024-11-06 Fixed tab and tab&shift navigation in crossword
+2024-11-04 Fixed not rendering MathJax formulas after changing layout or lesson metadata context
+2024-11-04 Added "STIX Two Math" font as default font for MathML
+2024-11-04 Added support for lameScriptURL metadata in Media Recorder
+2024-10-29 Added property to model iOS in Model Viewer 3D
+2024-10-28 Fixed hide section in ANB
+2024-10-25 Fixed issue with chapters in Hierarchical Lesson Report
+2024-10-25 Removed "Show video" property from Video addon
+2024-10-25 Added partial support of signing URL and include signed cookies
+2024-10-25 Added dropdown pages list in Assessments_Navigation_Bar
+2024-10-25 Fixed displaying FileSender popups in mCourser
+2024-10-25 Fixed issue with reset causing math gaps to throw erros when mathjax 2.7 is enabled
+2024-10-18 Added fullscreen functionality to Model Viewer 3D
+2024-10-18 Added Large preview to page
+2024-10-11 Added TTS support to Writing Calculations
+2024-10-08 Fixed Assessments Navigation Bar and openPopup to work with iframe with src not from this same origin
+2024-10-03 Added support to AI relevance
+2024-09-24 Added support to the IWB Toolbar addon on interactive whiteboards
+2024-09-19 Added keyboard navigation and TTS to Fractions addon
+2024-09-18 Added support to drag & drop on interactive whiteboards
+2024-09-18 Added disable navigation panels lesson property
+2024-09-11 Added method returning current page id to parent window
+2024-09-11 Changed the positioning of Zoom Image addon to be in a center of player area
+2024-09-11 Changed the positioning of commons popups to be in a center of player area
+2024-09-11 Fixed improved the Source List with 2.7.9 MathJax issues
+2024-09-09 Added calculating total score from all pages in Hierarchical_Lesson_Report
+2024-09-06 Fixed undefined ID in eKeyboard addon
+2024-09-05 Fixed Mutation Observer error in TextAudio addon
+2024-08-28 Fixed not displaying gaps in MathML render option.
+2024-08-27 Added Mutation Observer instead DOMNodeRemoved
+2024-08-26 Added cleaning after player for mLibro
+2024-08-21 Changed contentDataLoader to download addons individually by default
+2024-08-21 Added show/hideAngleMeasures to the Geometric Construct addon
+2024-08-21 Added length measures visibility and length decimal point properties to Gemoetric Construct
+2024-08-21 Added grid to Geometric Construct addon
+2024-08-21 Changed the moment a page is set as visited to the moment after it is loaded
+2024-08-08 Fixed added fallback for Assessment Navigation Bar getState in case it was called to early
+2024-08-08 Added alternative texts support for FlashCards
+2024-07-30 Added displaying default page order in test generator preview
+2024-07-29 Chunked libs.min.js
+2024-07-29 Added protection against negative total time
+2024-07-19 Added hide x/y axis property to the Geometric Construct addon
+2024-07-12 Fixed displaying popups in mobile mCourser
+2024-07-12 Added x and y axis to the Geometric Construct
+2024-07-09 Added Angle figure to the Geometric Construct addon
+2024-07-05 Change absolute to relative library url in LottiePlayer
+2024-07-05 Fixed placement of Zoom Image's "Full Screen image"
+2024-06-28 Added support for content base URL
+2024-06-28 Added Geometric Construct addon
+2024-06-25 Added popups direction in IWB Toolbar
+2024-06-21 Removed listeners to close Drawing addon's text editor after click outside canvas
+2024-06-18 Fixed LimitedCheck with maintain state selected
+2024-06-05 Fixed enabling locked Clock addon
+2024-06-04 Added grading user answer by AI in Paragraph and Paragraph Keyboard
+2024-06-04 Removed inclusion of Open Activities scores for mc
+2024-06-04 Added score and error count to Paragraph and Paragraph Keyboard addons
+2024-05-28 Added mockup method for setOpenActivitiesScores
+2024-05-20 Added max score to Paragraph and Paragraph Keyboard addons
+2024-05-16 Fixed incorrect display of formulas in the Text Selection
+2024-05-13 Added validation to course ID in the Cross Lesson
+2024-05-12 Added floatScore field to the PlayerUtils lesson score
+2024-05-09 Fixed state and reset functionality in the Model Viewer 3D
+2024-05-08 Added Zoom module
+2024-05-07 Change URL to library in Model Viewer 3D
+2024-04-26 Added Model Viewer 3D addon
+2024-04-19 Fixed mathjax not being rendered when added to a text module via the setText method
+2924-04-18 Fixed magic boxes throwing errors in iceditor on reload
+2024-04-05 Fixed adding special characters into iframe tag in Paragraph
+2024-04-04 Fixed issue with apostrophes in answers in Text and Table addons
+2024-04-02 Added Send only card changed event property to the FlashCards
+2024-03-27 Fixed issues with pause events in multiaudio and multiplegap addons
+2024-03-22 Fixed showing next or prev page index in ANB
+2024-03-22 Fixed draggable gaps with markup in Text weren't receiving correct classes in checkErrorsMode
+2024-03-22 Fixed the conflict between showAllCards vs ShowAllCards in FlashCards
+2024-03-22 Added base width/height properties to the Animation addon
+2024-03-22 Added intruder tokens to Text_Coloring
+2024-03-22 Added base width/height properties to the Slideshow addon
+2024-03-22 Added base width and base height properties to Image Viewer
+2024-03-22 Added update CSS and update template options to menu
+2024-03-15 Fixed first image gap receiving ui-state-disabled class in GSA mode
+2024-03-15 Fixed issue with Cross Lesson not working on mLibro
+2024-03-15 Added randomize order property to Flashcards
+2024-03-15 Added missing speech texts in Speech text dictionary
+2024-03-15 Added base width/height properties to the video addon
+2024-03-08 Added pause even to MultiAudio addon
+2024-03-08 Added disable score update property to the Check Button
+2024-02-28 Added property useDynamicPagination which activates sliding to previous or next page index
+2024-02-22 Added new property Omit in keyboard navigation to the modules
+2024-02-22 Added displaying next or previous page index in Assessments Navigation Bar
+2024-02-16 Added example answers to the  graph addon
+2024-02-16 Added example columns to the Count and Graph addon
+2024-02-16 Disable reading disable speech text on addons without the property
+2024-02-16 Added Show Answers and Gradual Show Answers to Point to Plot
+2024-02-16 Fixed state loading in Pargraph module when is not visible
+2024-02-09 Added disable property to speech text in Double State Button
+2024-02-09 Added help boxes to Writing Calculation addon
+2024-02-06 Enable getResponsiveLayouts function to use in Advanced Connector
+2024-02-02 Added marks to Plot addon
+2024-02-02 Fixed multiplegap not parsing alt texts correctly
+2024-02-02 Added events for changing/reversing the cards in the Flash Cards
+2024-02-02 Fixed changing position of IWB Toolbar when is opened
+2024-02-02 Added functionality to Stepwise mode bar in Slider addon to be always visible
+2024-02-02 Added gradual show answers support to the count and graph addon
+2024-01-26 Changed player-utils to provide max score for unvisited pages
+2024-01-26 Added GSA support to Plot addon
+2024-01-26 Added the option of creating static sections in Assessments Navigation Bar
+2024-01-24 Added GSA support to PieChart addon
+2024-01-19 Added GSA to the Line Selection addon
+2024-01-19 Changed upload functionality to use Google Cloud Store
+2024-01-19 Fixed inappropriate answers displaying in Draggable Gap while GSA is activated
+2024-01-19 Fixed errors in video addon without controls when action was performed in Media Recorder
+2024-01-17 Fixed changing position of IWB Toolbar
+2024-01-15 Fixed displaying value in Page Progress Panel
+2024-01-15 Added Gradual Show Answers in the Line Number
+2024-01-11 Fixed issue with LaTeX in Flash Card rendering differently at the front and back of the card
+2024-01-11 Added GSA to the Fractions addon
+2024-01-11 Added GSA support to Figure Drawing addon
+2024-01-05 Fixed read selected element in Inline Gaps
+2024-01-05 Fixed keyboard navigation selects not visible element
+2024-01-05 Fixed playing a recording from Media Recording when using IOS app
+2024-01-05 Added Gradual Show Answers in the Writing Calculations
+2024-01-05 Fixed wait dialog positioning
+2023-12-15 Fixed inability to play recording of Media Recording addon when it is on the first page of a lesson
+2023-12-14 Disabled autocomplete of editable gaps in Table, Text and Basic Math Gaps
+2023-12-13 Added omit text in TTS property to Double State Button
+2023-12-13 Added mute property to the feedback addon
+2023-12-11 Fixed non-blocking of empty gaps in check state for combination Table + Math
+2023-12-11 Fixed Text receiving nowrap style when not apropriate
+2023-12-06 Fixed bug in video addon displaying information that video cannot be played even though local resource exists
+2023-12-06 Added new languages to Responsive Voice
+2023-12-05 Fixed show answers mode not being restored in Text math gaps
+2023-11-23 Fixed width calculation in Ordering module when "Even width for all elements" is checked
+2023-11-23 Added support for paragraphInitDelay external variable in the Paragraph addon
+2023-11-23 Fixed inability to select text when there is slider addon on page
+2023-11-23 Expanded functionality for the text editor in the Drawing addon
+2023-11-15 Added a method enabling the use of NVDA
+2023-11-13 Changed position on collision of eKeyboard from flip to flipfit
+2023-11-13 Changed Image Identification to set 'Alternative text' as 'alt' attribute
+2023-11-08 Added property isNotActivity to the Text Coloring
+2023-11-08 Added Gradual Show Answers to Connecting Dots
+2023-11-08 Fixed alt text in Connection addon
+2023-11-08 Fixed displaying geometric devices in IWB Toolbar
+2023-11-08 Added play, pause and stop commands to Flash Cards
+2023-11-03 Fixed too early launch of blur feedback when using eKeyboard on mobile devices
+2023-11-03 Added new container for response mark in the Image Gap
+2023-10-27 Fixed recording malfunction on application
+2023-10-27 Fixed checking correctness of drawing in Shape Tracing for scaled player
+2023-10-27 Removed re-downloading of lesson page XML when changing layout
+2023-10-27 Fixed IWB Toolbar not scrolling when fixed on mCourser
+2023-10-25 Added Orientations property to Connection addon
+2023-10-20 Fixed marking of correct answers in the Ordering while using GSA 
+2023-10-18 Added new method setGapText to the Table addon
+2023-10-13 Fixed sending event about the correct word when a letter from outside the word was entered
+2023-10-13 Fixed setting width for gaps
+2023-10-13 Added support for random order in Source List module
+2023-10-13 Fixed creating empty recording in Media Recorder
+2023-10-13 Added Expansion Direction property to the IWB Toolbar addon
+2023-10-06 Fixed bug with inability to record in Media Recording addon in FireFox
+2023-10-06 Changed getPage and getPageById to return null for non-existent index/id, rather than throw and error
+2023-10-06 Added getFullPresentationScore method to player-utils
+2023-10-05 Changed Cross Lesson to cache course access request results
+2023-09-27 Fixed issue with width of draggable elements in Text when gap width is not equal 0
+2023-09-27 Fixed mathjax issue in Text when a page has been reloaded in quick succession
+2023-09-20 Fixed issue with too long draggable elements in Text
+2023-09-20 Fixed problem with line display in addon connection
+2023-09-20 Fixed work of addon Connection with GSA when page is reportable
+2023-09-18 Fixed dropdown value in Text not being saved correctly in state
+2023-09-13 Fixed sending event after leaving gap when TTS is activated
+2023-09-13 Fixed skipping sentence after special characters
+2023-09-13 Fixed reading hidden elements in the EditableWindow
+2023-08-31 Removed navigation on invisible elements in AudioText addon when TTS or keyboard navigation is active
+2023-08-31 Added documentation to MathText
+2023-08-25 Correct calculating gap width
+2023-08-25 Fixed issue with show answers mode in Table+Math
+2023-08-25 Fixed reset in Paragraph to restore original visibility
+2023-08-25 Removed reading punctuation marks in the wrong places in chrome
+2023-08-22 Fixed issues caused by loading new content using the same player
+2023-08-16 Fixed issue with the Audio addon not playing on new iOS devices
+2023-08-08 Added reducing audio file in MediaRecorder
+2023-08-07 Fixed issues with rounding score in progress bar and lesson report
+2023-08-07 Removed capitalization of letter ß in Magic Boxes
+2023-08-03 Fixed storing current visibility status in Puzzle
+2023-07-24 Changed editor in Advance Connector addon
+2023-07-20 Fixed counting score when the Crossword has sample answers
+2023-07-19 Restored page numbering from 1 in Hierarchical Lesson Report
+2023-07-19 Fixed added audio in Choice not working on mobile
+2023-07-19 Fixed the isAllOK function in the Magic Boxes
+2023-07-19 Fixed setting visibility on reset in Catch addon
+2023-07-19 Added support for rootDirectory metadata in Media Recorder
+2023-07-19 Changed label of functionality to sort addons CSS classes in Editor from "Sort" to "Sort A-Z"
+2023-07-19 Fixed incorrect counting of the gap index in the text module after keyboard navigation on links
+2023-07-19 Fixed disabled Text getting enabled on gradual hide answers
+2023-07-13 Fixed updating score in Crossword after GradualShowAnswer
+2023-07-07 Fixed interaction of LaTeX in FlashCards
+2023-07-06 Added GapMaxLength property to the Table addon
+2023-07-05 Fixed Pragraph styling of the current content affecting Show Answers text
+2023-07-05 Changed CSS editor
+2023-07-05 Added TTS to Timer
+2023-06-30 Fixed keyboard navigation when dropdown elements in text
+2026-06-29 Fixed Basic Math Gaps addon not working correctly when Show Answers increments mistake counter
+2023-06-29 Added missing addons from default tts titles editor
+2023-06-26 Fixed disabled Ordering after GradualHideAnswer
+2023-06-23 Added getWorksWithModulesList method to the Limited Reset button
+2023-06-23 Fixed nested addons in Text breaking printing
+2023-06-23 Fixed not being able to set page index 0 in alternative page titles property of HLR
+2023-06-19 Added alphabetical sorting of CSS classes
+2023-06-13 Fixed GSA in Coloring in exported SCORM packages 
+2023-06-07 Added conversion to mp3 in media recorder after recording is complete
+2023-06-07 Fixed Show Answers with mistake counter activated in Points and Lines
+2023-06-07 Fixed keyboard navigation not working correctly when there's a mix of draggable and editable gaps in Text
+2023-06-01 Fixed audio in Choice not working on mobile
+2023-05-31 Added printing support for Zoom Image
+2023-05-31 Fixed dragging out responses from draggable gap after changing page in Table addon
+2023-05-31 Added renderSVGAsHTML property to Double State Button letting creating SVG file from data
+2023-05-26 Fixed Advance Connector addon losing context of Show Answers and Hide Answers event
+2023-05-26 Fixed reading dots in text list
+2023-05-26 Fixed dropdownClicked event received behaviour in Audio, TextAudio, Video and MultiAudio addon when paused
+2023-05-26 Fixed hierarchical lesson report incorrectly restoring state when some pages/chapters are not reportable
+2023-05-18 Fixed reading stoppage (TTS)
+2023-05-16 Changed Text and Choice module do not reset visibility for Gradual Hide Answers
+2023-05-16 Fixed issue with show and hide in Text when in showAnswers mode
+2023-05-12 Fixed 0 width/height groups in parser
+2023-05-12 Fixed separation of events listening due to the platform in the Cross Lesson
+2023-05-12 Added getWorksWithModulesList function to LimitedCheck addon
+2023-05-11 Fixed reading separated punctuation marks (TTS)
+2023-05-08 Fixed Gap Binder now working with GSA when page is reportable
+2023-05-08 Added getWorksWithModulesList function to LimitedShowAnswers addon
+2023-05-08 Fixed text not being selectable in Paragraph when editor is disabled
+2023-05-08 Expanded support for alternative texts in Quiz addon
+2023-04-27 Fixed problem with incorrect conversion of & to &amp; in links in text module
+2023-04-25 Added support for printable for Page Score Counter addon
+2023-04-24 Added support for printable for crossword addon
+2023-04-19 Fixed scroll for Coloring addon when active TTS
+2023-04-18 Fixed print of text coloring when color ID is not equal to color description
+2023-04-04 Adding gap grouping in the Text module
+2023-04-04 Fixed displaying answers in the hidden Multiplegap
 2023-04-03 Fixed loading subtitles preview in editor
 2022-03-29 Fixed problem with incorrect positioning of Catch and Puzzle addons on mobile devices
 2023-03-23 Fixed loading subtitles in Text Audio

@@ -12,6 +12,7 @@
 		<property name="Center horizontally" nameLabel="feedback_property_center_horizontally" type="boolean"/>
 		<property name="Center vertically" nameLabel="feedback_property_center_vertically" type="boolean"/>
 		<property name="Is not an activity" nameLabel="feedback_property_is_not_an_activity" type="boolean"/>
+		<property name="Mute" nameLabel="feedback_property_mute" type="boolean"/>
 		<property name="langAttribute" nameLabel="feedback_property_lang_attribute" type="string"/>
         <property name="speechTexts" nameLabel="feedback_property_speech_texts" type="staticlist">
             <property name="Positive" nameLabel="feedback_property_positive" type="staticrow">
@@ -207,7 +208,9 @@
         presenter.currentStateDefault = true;
         presenter.currentStateId = null;
 
-        presenter.readCurrentMessage(false);
+        if (!presenter.configuration.isMute) {
+            presenter.readCurrentMessage(false);
+        }
     };
 
     presenter.setResponse = function (id) {
@@ -231,7 +234,9 @@
         presenter.currentStateDefault = false;
         presenter.currentStateId = id;
 
-        presenter.readCurrentMessage(false);
+        if (!presenter.configuration.isMute) {
+            presenter.readCurrentMessage(false);
+        }
     };
 
 
@@ -248,7 +253,8 @@
     }
 
     presenter.upgradeModel = function (model) {
-        return presenter.upgradeFrom_01(model);
+        var upgradedModel = presenter.upgradeFrom_01(model);
+        return presenter.upgradeAddMute(upgradedModel);
     };
 
     presenter.upgradeFrom_01 = function(model) {
@@ -272,6 +278,16 @@
         }
         return upgradedModel;
     };
+
+    presenter.upgradeAddMute = function(model) {
+            var upgradedModel = {};
+            $.extend(true, upgradedModel, model);
+
+            if (!upgradedModel["Mute"]) {
+                upgradedModel["Mute"] = "False";
+            }
+            return upgradedModel;
+        };
 
     presenter.initialize = function (view, model, preview) {
         var text;
@@ -416,6 +432,7 @@
             isVisible: validatedIsVisible,
             isVisibleByDefault: validatedIsVisible,
             isTabindexEnabled: ModelValidationUtils.validateBoolean(model['Is Tabindex Enabled']),
+            isMute: ModelValidationUtils.validateBoolean(model['Mute']),
             langTag: model['langAttribute']
         };
     };
