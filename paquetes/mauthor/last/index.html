@@ -1,8 +1,10 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width">
+    <meta name="viewport"
+          content="width=device-width">
     <title>LC_07_01_LL_01_R02 - mauthor.com</title>
     <script type="text/javascript">
         const USE_SCORM = true;
@@ -18,20 +20,20 @@
     </script>
 
     <script>
-        addScript('javascript/jquery-1.7.1.min.js');
-        addScript('javascript/semi-responsive-layout-chooser.js');
-        addScript('icplayer/icplayer.nocache.js');
-        addScript('javascript/screen.js');
+        addScript('../../Players/mauthor/javascript/jquery-1.7.1.min.js');
+        addScript('../../Players/mauthor/javascript/semi-responsive-layout-chooser.js');
+        addScript('../../Players/mauthor/icplayer/icplayer.nocache.js');
+        addScript('../../Players/mauthor/javascript/screen.js');
 
         if (USE_SCORM) {
-            addScript('javascript/mauthor_scorm.js');
+            addScript('../../Players/mauthor/javascript/mauthor_scorm.js');
         }
         if (USE_XAPI) {
-            addScript('javascript/mauthor_xapi.js');
+            addScript('../../Players/mauthor/javascript/mauthor_xapi.js');
         }
         let mathJaxScript = document.createElement('script');
         mathJaxScript.type = 'text/x-mathjax-config';
-        
+
         mathJaxScript.innerHTML = `
         MathJax.Hub.Config({
             TeX: {imageFont: null, extensions: ["mhchem.js", "AMSsymbols.js", "AMSmath.js"]},
@@ -41,9 +43,9 @@
             jax: ["input/TeX", "input/MathML", "output/HTML-CSS"],
             playerObject: "player"
           });`;
-        
+
         document.write(mathJaxScript.outerHTML);
-        addScript('javascript/MathJax/MathJax.js');
+        addScript('../../Players/mauthor/javascript/MathJax/MathJax.js');
     </script>
 
     <style>
@@ -61,15 +63,15 @@
         }
     </style>
     <script>
-  function chooseLayout(layoutChooser, screenConfiguration) {
-    var isMobile = screenConfiguration.orientation !== window.mAuthor.ScreenUtils.ORIENTATION_TYPES.NOT_MOBILE;
-    var isVertical = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.PORTRAIT;
-    var isHorizontal = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.LANDSCAPE;
+        function chooseLayout(layoutChooser, screenConfiguration) {
+            var isMobile = screenConfiguration.orientation !== window.mAuthor.ScreenUtils.ORIENTATION_TYPES.NOT_MOBILE;
+            var isVertical = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.PORTRAIT;
+            var isHorizontal = screenConfiguration.orientation === window.mAuthor.ScreenUtils.ORIENTATION_TYPES.LANDSCAPE;
 
-    return layoutChooser.chooseLayout(screenConfiguration.width, isMobile, isVertical, isHorizontal);
-  }
+            return layoutChooser.chooseLayout(screenConfiguration.width, isMobile, isVertical, isHorizontal);
+        }
 
-</script>
+    </script>
 
     <script type="text/javascript">
         var player;
@@ -91,7 +93,7 @@
                 lessonTitle: "",
                 courseIRI: "",
                 lessonDescription: "",
-                
+
                 actor: {
                     account: {
                         homePage: "http://example.lms.com/",
@@ -259,7 +261,7 @@
             const LOAD_LESSON = "LOAD_LESSON";
             const RESIZE = "RESIZE";
 
-            if (!event.data || typeof(event.data) !== 'string') {
+            if (!event.data || typeof (event.data) !== 'string') {
                 return;
             }
 
@@ -357,13 +359,13 @@
 
             if (!isMobile || FIT_FULL_PAGE) {
                 // this moves the lesson to the center of screen on PC
-                $("#scrollableBody").css({'display': 'flex', 'justify-content': 'center'});
+                $("#scrollableBody").css({ 'display': 'flex', 'justify-content': 'center' });
             }
 
             player.onPageLoaded(function onPageLoadedHandler() {
-                
-                    isAttemptSaved = false;
-                
+
+                isAttemptSaved = false;
+
                 start = start || new Date().getTime();
 
                 if (!firstPageLoaded) {
@@ -572,7 +574,7 @@
         function loadCurrentScaleAndShareWithPlayer() {
             const appWidth = document.getElementById("scrollableBody").offsetWidth;
             let appHeight = isIOS() ? getIOSHeight(appWidth) : window.innerHeight + 10;
-            if(XAPI_WITH_SUBMIT_BUTTON){
+            if (XAPI_WITH_SUBMIT_BUTTON) {
                 appHeight = window.innerHeight + 10 - 80;
             }
 
@@ -614,17 +616,19 @@
     </script>
 </head>
 
-<body class="no-margin" onload="doStart();">
+<body class="no-margin"
+      onload="doStart();">
 
 
-<div id="scrollableBody">
-    <div id="content-view">
-        <div id="content">
-            <div id="_icplayer" class="no-margin pull-left"></div>
-            <div class="clear"></div>
+    <div id="scrollableBody">
+        <div id="content-view">
+            <div id="content">
+                <div id="_icplayer"
+                     class="no-margin pull-left"></div>
+                <div class="clear"></div>
+            </div>
         </div>
     </div>
-</div>
 </body>
 
 
