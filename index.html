@@ -72,53 +72,79 @@
       <input type="radio"
              class="btn-check"
              name="btnradio"
-             id="btnradio1"
+             id="btnradio0"
              autocomplete="off"
              onclick="cambiaRecurso(0)"
              checked>
       <label class="btn btn-outline-primary"
-             for="btnradio1">mAuthor vacío</label>
+             for="btnradio0">mAuthor original</label>
+      <input type="radio"
+             class="btn-check"
+             name="btnradio"
+             id="btnradio1"
+             autocomplete="off"
+             onclick="cambiaRecurso(1)">
+      <label class="btn btn-outline-primary"
+             for="btnradio1">mAuthor last</label>
       <input type="radio"
              class="btn-check"
              name="btnradio"
              id="btnradio2"
              autocomplete="off"
-             onclick="cambiaRecurso(1)">
+             onclick="cambiaRecurso(2)">
       <label class="btn btn-outline-primary"
-             for="btnradio2">mAuthor con datos</label>
+             for="btnradio2">mAuthor vacío</label>
       <input type="radio"
              class="btn-check"
              name="btnradio"
              id="btnradio3"
-             onclick="cambiaRecurso(2)"
-             autocomplete="off">
+             autocomplete="off"
+             onclick="cambiaRecurso(3)">
       <label class="btn btn-outline-primary"
-             for="btnradio3">Articulate vacío</label>
+             for="btnradio3">mAuthor con datos</label>
       <input type="radio"
              class="btn-check"
              name="btnradio"
              id="btnradio4"
-             onclick="cambiaRecurso(3)"
+             onclick="cambiaRecurso(4)"
              autocomplete="off">
       <label class="btn btn-outline-primary"
-             for="btnradio4">Articulate con datos</label>
+             for="btnradio4">Articulate vacío</label>
       <input type="radio"
              class="btn-check"
              name="btnradio"
              id="btnradio5"
-             onclick="cambiaRecurso(4)"
+             onclick="cambiaRecurso(5)"
              autocomplete="off">
       <label class="btn btn-outline-primary"
-             for="btnradio5">Capturador de clics</label>
+             for="btnradio5">Articulate con datos</label>
+      <input type="radio"
+             class="btn-check"
+             name="btnradio"
+             id="btnradio6"
+             onclick="cambiaRecurso(6)"
+             autocomplete="off">
+      <label class="btn btn-outline-primary"
+             for="btnradio6">Capturador de clics</label>
     </div>
   </div>
   <script>
     // Los tipos de ejemplo
-    const recursos = ['mauthor_vacio', 'mauthor_datos', 'articulate_vacio', 'articulate_datos', 'clic'];
+    const recursos = ['mauthor_original', 'mauthor_last', 'mauthor_vacio', 'mauthor_datos', 'articulate_vacio', 'articulate_datos', 'clic'];
     // 0 = mAuthor, 1 = Articulate
     let recurso = recursos[0];
     // Un objeto de ejemplo con las tres variables básicas que está esperando el mAuthor y el Articulate. Vienen desde el Backend
     const obj = {
+      'mauthor_original': {
+        "cmi.suspend_data": "",
+        "cmi.location": "",
+        "cmi.completion_status": ""
+      },
+      'mauthor_last': {
+        "cmi.suspend_data": "",
+        "cmi.location": "",
+        "cmi.completion_status": ""
+      },
       'mauthor_vacio': {
         "cmi.suspend_data": "",
         "cmi.location": "",
@@ -150,11 +176,13 @@
     };
     // Las rutas URL relativas que cargan el mAuthor o el Articulate
     const rutas = {
+      'mauthor_original': 'mauthor/original/index.html&tipo=mauthor',
+      'mauthor_last': 'mauthor/last/index.html&tipo=mauthor',
       'mauthor_vacio': 'mauthor/Recurso700/index.html&tipo=mauthor',
       'mauthor_datos': 'mauthor/Recurso700/index.html&tipo=mauthor',
       'articulate_vacio': 'articulate/Recurso130/index_lms.html&tipo=articulate',
       'articulate_datos': 'articulate/Recurso130/index_lms.html&tipo=articulate',
-      'clic': 'clic/story.html&tipo=clic'
+      'clic': 'clic/story.html&tipo=clic',
     };
     const rutaWrapper = 'paquetes/wrapper/wrapper.html?ruta=../';
     // El iframe que contiene el recurso, que se crea dinámicamente y que envía el postMessage apenas se carga.
